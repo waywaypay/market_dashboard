@@ -15,10 +15,14 @@ to stderr and skipped — one delisted symbol must not sink the strip — and th
 pull raises only when every ticker fails, which the source stage surfaces as
 SourceHealth(quotes=failed) with the reason.
 
-The endpoint is public but unofficial (it is what powers finance.yahoo.com):
-requests carry a browser-like User-Agent (Yahoo's CDN rejects bot UAs) and
-are throttled. If the vendor misbehaves, mix quotes back to fixtures with
-BRIEF_QUOTES=fixture — the interface stays vendor-neutral.
+The endpoint is public but unofficial (it is what powers finance.yahoo.com),
+and shared cloud egress IPs get rate-limited aggressively. Three defenses:
+requests are paced (throttle_s between hits), 429/5xx responses get a short
+exponential backoff (respecting Retry-After, capped), and the daily-history
+half of the data — sigma and avg_volume only change once per session — is
+cached per ticker for the UTC day, so steady-state refreshes make one live
+request per ticker. If the vendor still misbehaves, mix quotes back to
+fixtures with BRIEF_QUOTES=fixture — the interface stays vendor-neutral.
 """
 
 from __future__ import annotations
@@ -27,7 +31,7 @@ import os
 import statistics
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import httpx
 
@@ -44,6 +48,12 @@ BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/1
 
 DEFAULT_SIGMA = 3.0  # conservative stand-in when history is too short (recent IPOs)
 MIN_RETURNS = 5  # fewer trailing %-moves than this and sigma is not estimable
+RETRY_AFTER_CAP_S = 10.0  # never let a Retry-After header stall the boot refresh
+
+# ticker -> (utc date, closes, volumes). Daily history is immutable within a
+# session, so refreshes after the first each day skip half their requests.
+# Module-level so the per-run provider instances the registry builds share it.
+_HISTORY_CACHE: dict[str, tuple[date, list[float], list[int]]] = {}
 
 
 class YahooQuoteProvider(QuoteProvider):
@@ -51,7 +61,9 @@ class YahooQuoteProvider(QuoteProvider):
         self,
         companies: dict[str, str] | None = None,
         trailing_days: int | None = None,
-        throttle_s: float = 0.15,
+        throttle_s: float = 0.5,
+        max_attempts: int = 3,
+        backoff_s: float = 1.5,
         transport: httpx.BaseTransport | None = None,
     ):
         self.companies = companies or {}  # ticker -> display name
@@ -61,6 +73,8 @@ class YahooQuoteProvider(QuoteProvider):
             else os.environ.get("QUOTES_TRAILING_DAYS", "20")
         )
         self.throttle_s = throttle_s
+        self.max_attempts = max_attempts
+        self.backoff_s = backoff_s
         self._client = make_client(
             transport=transport,
             headers={"User-Agent": BROWSER_UA, "Accept": "application/json"},
@@ -88,12 +102,11 @@ class YahooQuoteProvider(QuoteProvider):
     # -- internals ------------------------------------------------------------
 
     def _quote_for(self, ticker: str) -> Quote:
-        daily = self._chart(ticker, {"range": "3mo", "interval": "1d"})
+        closes, volumes = self._daily_history(ticker)
         live = self._chart(
             ticker, {"range": "1d", "interval": "5m", "includePrePost": "true"}
         )
 
-        closes, volumes = _completed_days(daily)
         moves = _pct_moves(closes)[-self.trailing_days :]
         trailing_vol = volumes[-self.trailing_days :]
 
@@ -126,31 +139,60 @@ class YahooQuoteProvider(QuoteProvider):
             else DEFAULT_SIGMA,
         )
 
+    def _daily_history(self, ticker: str) -> tuple[list[float], list[int]]:
+        today = datetime.now(timezone.utc).date()
+        cached = _HISTORY_CACHE.get(ticker)
+        if cached is not None and cached[0] == today:
+            return cached[1], cached[2]
+        daily = self._chart(ticker, {"range": "3mo", "interval": "1d"})
+        closes, volumes = _completed_days(daily)
+        if closes:
+            _HISTORY_CACHE[ticker] = (today, closes, volumes)
+        return closes, volumes
+
     def _chart(self, symbol: str, params: dict[str, str]) -> dict:
-        time.sleep(self.throttle_s)  # polite pacing — two requests per ticker
         last_error: Exception | None = None
-        for host in CHART_HOSTS:
-            url = CHART_URL.format(host=host, symbol=symbol)
-            try:
-                response = self._client.get(url, params=params)
-            except httpx.HTTPError as exc:  # DNS/connect/timeout -> try the mirror
-                last_error = exc
-                continue
-            try:
-                chart = response.json().get("chart") or {}
-            except ValueError:
-                chart = {}
-            result = (chart.get("result") or [None])[0]
-            if response.status_code == 200 and result is not None:
-                return result
-            error = (chart.get("error") or {}).get("description") or (
-                f"HTTP {response.status_code}"
-            )
-            last_error = RuntimeError(f"Yahoo chart {symbol}: {error}")
-            if response.status_code == 404:
-                break  # unknown/delisted symbol — the mirror will agree
+        wait = self.backoff_s
+        for attempt in range(self.max_attempts):
+            if attempt:
+                time.sleep(wait)
+                wait *= 2
+            for host in CHART_HOSTS:
+                time.sleep(self.throttle_s)  # polite pacing under Yahoo's budget
+                url = CHART_URL.format(host=host, symbol=symbol)
+                try:
+                    response = self._client.get(url, params=params)
+                except httpx.HTTPError as exc:  # DNS/connect/timeout -> try the mirror
+                    last_error = exc
+                    continue
+                try:
+                    chart = response.json().get("chart") or {}
+                except ValueError:
+                    chart = {}
+                result = (chart.get("result") or [None])[0]
+                if response.status_code == 200 and result is not None:
+                    return result
+                error = (chart.get("error") or {}).get("description") or (
+                    f"HTTP {response.status_code}"
+                )
+                last_error = RuntimeError(f"Yahoo chart {symbol}: {error}")
+                if response.status_code == 404:
+                    raise last_error  # unknown/delisted symbol — retrying won't help
+                if response.status_code == 429:
+                    # rate-limited: hitting the mirror now only digs the hole
+                    # deeper (the budget is per source IP) — back off instead
+                    wait = max(wait, _retry_after_s(response))
+                    break
         assert last_error is not None
         raise last_error
+
+
+def _retry_after_s(response: httpx.Response) -> float:
+    value = response.headers.get("Retry-After")
+    try:
+        return min(float(value), RETRY_AFTER_CAP_S) if value else 0.0
+    except ValueError:
+        return 0.0
 
 
 def _bars(result: dict) -> tuple[list[int], list, list]:
