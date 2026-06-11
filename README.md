@@ -158,13 +158,22 @@ sends via the configured `EmailProvider` (fixture writes to `out/emails/`).
 ## Deploying (Render)
 
 `render.yaml` is a ready Blueprint: in Render choose **New → Blueprint**,
-point it at this repo, and it provisions one web service. Manually, the two
-commands are:
+point it at this repo, and it provisions one web service with the right
+build/start commands and env vars. **Creating a Web Service manually works
+too**, but `render.yaml` is ignored on that path — Render falls back to its
+own defaults (`poetry install`, current Python), so you must set the two
+commands yourself in the service settings:
 
 ```
-Build:  pip install -e . && cd web && npm ci && npm run build
-Start:  python -m pipeline.serve
+Build Command:  pip install -r requirements.txt && cd web && npm ci && npm run build
+Start Command:  python -m pipeline.serve
 ```
+
+The repo is robust to Render's auto-detection either way: `.python-version`
+pins Python 3.11, `requirements.txt` covers the pip default path, and
+`[tool.poetry].packages` makes the bare `poetry install` default succeed —
+but a Poetry-only build never compiles the dashboard, so without the build
+command above the server answers with its 503 "dashboard not built" page.
 
 `pipeline/serve.py` is the single production process: it serves the built
 dashboard, serves artifacts with `no-store` freshness, exposes

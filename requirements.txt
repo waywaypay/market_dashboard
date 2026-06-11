@@ -1,0 +1,4 @@
+# Render's pip default build path (`pip install -r requirements.txt`) and any
+# plain-pip host: installs the pipeline package (editable) plus all deps from
+# pyproject.toml — single source of truth, no version duplication here.
+-e .
