@@ -21,6 +21,7 @@ from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.util import infer_ticker, strip_tags
 from pipeline.providers.yahoo_quotes import (
     _HISTORY_CACHE,
+    _SESSION,
     DEFAULT_SIGMA,
     YahooQuoteProvider,
 )
@@ -28,10 +29,13 @@ from pipeline.contracts.universe import RSSFeed
 
 
 @pytest.fixture(autouse=True)
-def _fresh_yahoo_history_cache():
+def _fresh_yahoo_state():
+    """Both module-level caches must not leak between tests."""
     _HISTORY_CACHE.clear()
+    _SESSION.update(crumb=None, cookies=None)
     yield
     _HISTORY_CACHE.clear()
+    _SESSION.update(crumb=None, cookies=None)
 
 NOW = datetime.now(timezone.utc)
 COMPANIES = {"VCYT": "Veracyte", "NTRA": "Natera", "GH": "Guardant Health"}
@@ -346,6 +350,9 @@ def _live_payload(symbol: str) -> dict:
 
 
 def yahoo_handler(req: httpx.Request) -> httpx.Response:
+    """Chart API only — handshake/v7 requests 404, forcing the chart fallback."""
+    if "/v8/finance/chart/" not in req.url.path:
+        return httpx.Response(404, text="no v7 here")
     assert "Mozilla" in req.headers.get("User-Agent", "")  # Yahoo rejects bot UAs
     symbol = req.url.path.rsplit("/", 1)[-1]
     params = dict(req.url.params)
@@ -381,7 +388,7 @@ def _yahoo_provider() -> YahooQuoteProvider:
     )
 
 
-def test_yahoo_provider_builds_premarket_quote_from_chart_api() -> None:
+def test_yahoo_provider_builds_premarket_quote_via_chart_fallback() -> None:
     (q,) = _yahoo_provider().snapshot(["VCYT"])
     assert q.ticker == "VCYT" and q.name == "Veracyte"  # universe name beats Yahoo's
     assert q.last == 105.0  # latest pre-market bar; null bars skipped
@@ -406,6 +413,8 @@ def test_yahoo_provider_raises_only_when_every_ticker_fails() -> None:
 
 def test_yahoo_provider_fails_over_to_mirror_host() -> None:
     def flaky_edge(req: httpx.Request) -> httpx.Response:
+        if "/v8/finance/chart/" not in req.url.path:
+            return httpx.Response(404, text="no v7 here")
         if req.url.host == "query1.finance.yahoo.com":
             return httpx.Response(502, text="bad edge")
         assert req.url.host == "query2.finance.yahoo.com"
@@ -420,6 +429,8 @@ def test_yahoo_provider_fails_over_to_mirror_host() -> None:
 
 def test_yahoo_provider_reports_flat_when_nothing_traded_today() -> None:
     def quiet_open(req: httpx.Request) -> httpx.Response:
+        if "/v8/finance/chart/" not in req.url.path:
+            return httpx.Response(404, text="no v7 here")
         if dict(req.url.params).get("interval") == "1d":
             return httpx.Response(200, json=_daily_payload("VCYT"))
         payload = _live_payload("VCYT")
@@ -438,9 +449,11 @@ def test_yahoo_provider_reports_flat_when_nothing_traded_today() -> None:
 
 
 def test_yahoo_provider_backs_off_through_a_429_and_spares_the_mirror() -> None:
-    seen: list[str] = []
+    seen: list[str] = []  # hosts of chart requests only
 
     def limited(req: httpx.Request) -> httpx.Response:
+        if "/v8/finance/chart/" not in req.url.path:
+            return httpx.Response(404, text="no v7 here")
         seen.append(req.url.host)
         if len(seen) == 1:
             return httpx.Response(429, text="slow down", headers={"Retry-After": "0"})
@@ -463,7 +476,9 @@ def test_yahoo_provider_caches_daily_history_across_runs() -> None:
     daily_hits = {"n": 0}
 
     def counting(req: httpx.Request) -> httpx.Response:
-        if dict(req.url.params).get("interval") == "1d":
+        if "/v8/finance/chart/" in req.url.path and (
+            dict(req.url.params).get("interval") == "1d"
+        ):
             daily_hits["n"] += 1
         return yahoo_handler(req)
 
@@ -479,6 +494,8 @@ def test_yahoo_provider_caches_daily_history_across_runs() -> None:
 
 def test_yahoo_provider_defaults_sigma_on_short_history() -> None:
     def thin_handler(req: httpx.Request) -> httpx.Response:
+        if "/v8/finance/chart/" not in req.url.path:
+            return httpx.Response(404, text="no v7 here")
         if dict(req.url.params).get("interval") == "1d":
             payload = _daily_payload("VCYT")
             result = payload["chart"]["result"][0]
@@ -494,3 +511,143 @@ def test_yahoo_provider_defaults_sigma_on_short_history() -> None:
     (q,) = provider.snapshot(["VCYT"])
     assert q.sigma == DEFAULT_SIGMA  # 2 trailing moves -> not estimable
     assert q.avg_volume == 1_000_000
+
+
+# ------------------------------------------------- Yahoo batched v7 (primary path)
+
+CRUMB = "test-crumb"
+
+
+def _v7_row(symbol: str, **overrides) -> dict:
+    row = {
+        "symbol": symbol,
+        "shortName": f"{symbol} Inc.",
+        "marketState": "PRE",
+        "preMarketPrice": 105.0,
+        "regularMarketPrice": 100.0,
+        "regularMarketPreviousClose": 100.0,
+        "regularMarketVolume": 3500,
+        "averageDailyVolume3Month": 1_000_000,
+    }
+    row.update(overrides)
+    return row
+
+
+def _yahoo_routes(v7_rows: dict[str, dict], chart=yahoo_handler):
+    """Full happy-path transport: cookie -> crumb -> batched v7 (+ charts)."""
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        path = req.url.path
+        if req.url.host == "fc.yahoo.com":
+            # like the real thing: scoped to .yahoo.com so query1/query2 get it
+            return httpx.Response(
+                404, headers={"set-cookie": "A3=abc; Domain=.yahoo.com; Path=/"}
+            )
+        if path.endswith("/v1/test/getcrumb"):
+            return httpx.Response(200, text=CRUMB)
+        if path.endswith("/v7/finance/quote"):
+            params = dict(req.url.params)
+            assert params.get("crumb") == CRUMB  # the crumb must ride along
+            assert "A3=abc" in req.headers.get("cookie", "")  # with its cookie
+            symbols = params["symbols"].split(",")
+            rows = [v7_rows[s] for s in symbols if s in v7_rows]
+            return httpx.Response(200, json={"quoteResponse": {"result": rows}})
+        return chart(req)
+
+    return handler
+
+
+def test_yahoo_provider_prices_the_whole_universe_in_one_quote_call() -> None:
+    v7_calls = {"n": 0}
+    rows = {
+        "VCYT": _v7_row("VCYT"),
+        "NTRA": _v7_row("NTRA", marketState="REGULAR", regularMarketPrice=98.0),
+    }
+    base = _yahoo_routes(rows)
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/v7/finance/quote"):
+            v7_calls["n"] += 1
+        return base(req)
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(handler)
+    )
+    by = {q.ticker: q for q in provider.snapshot(["VCYT", "NTRA"])}
+
+    assert v7_calls["n"] == 1  # one request priced every ticker
+    assert by["VCYT"].name == "Veracyte" and by["VCYT"].last == 105.0
+    assert by["VCYT"].chg_pct == 5.0  # preMarketPrice vs previous close
+    assert by["VCYT"].volume == 3500 and by["VCYT"].avg_volume == 1_000_000
+    moves = [(b - a) / a * 100.0 for a, b in zip(DAILY_CLOSES, DAILY_CLOSES[1:])]
+    assert by["VCYT"].sigma == pytest.approx(statistics.stdev(moves[-20:]), abs=0.01)
+    assert by["NTRA"].last == 98.0  # regular session price outside pre-market
+    assert by["NTRA"].chg_pct == -2.0
+
+
+def test_yahoo_provider_uses_post_market_price_after_the_close() -> None:
+    rows = {"VCYT": _v7_row("VCYT", marketState="POSTPOST", postMarketPrice=99.0)}
+    provider = YahooQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(_yahoo_routes(rows))
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 99.0 and q.chg_pct == -1.0  # vs previous close
+
+
+def test_yahoo_provider_ships_prices_even_when_history_is_throttled() -> None:
+    def throttled_history(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="slow down", headers={"Retry-After": "0"})
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        max_attempts=1,
+        backoff_s=0,
+        transport=httpx.MockTransport(
+            _yahoo_routes({"VCYT": _v7_row("VCYT")}, chart=throttled_history)
+        ),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 105.0  # the price survives
+    assert q.sigma == DEFAULT_SIGMA  # history degraded; it must not kill the quote
+    assert q.avg_volume == 1_000_000  # v7's 3-month average fills in
+
+
+def test_yahoo_provider_respects_its_time_budget() -> None:
+    chart_hits = {"n": 0}
+
+    def black_hole(req: httpx.Request) -> httpx.Response:
+        if "/v8/finance/chart/" not in req.url.path:
+            return httpx.Response(404, text="no v7 here")
+        chart_hits["n"] += 1
+        return httpx.Response(429, text="slow down", headers={"Retry-After": "60"})
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=999,  # would sleep ~forever if the budget didn't gate retries
+        deadline_s=0,
+        transport=httpx.MockTransport(black_hole),
+    )
+    with pytest.raises(RuntimeError, match="all 2 tickers"):
+        provider.snapshot(["VCYT", "NTRA"])
+    # over budget: history skipped, one live attempt for the first ticker,
+    # remaining tickers dropped — a wedged vendor can't wedge the refresh
+    assert chart_hits["n"] == 1
+
+
+def test_yahoo_provider_does_the_crumb_handshake_once_per_process() -> None:
+    crumb_calls = {"n": 0}
+    base = _yahoo_routes({"VCYT": _v7_row("VCYT")})
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/v1/test/getcrumb"):
+            crumb_calls["n"] += 1
+        return base(req)
+
+    transport = httpx.MockTransport(handler)
+    for _ in range(2):  # two refreshes = two provider instances, same process
+        provider = YahooQuoteProvider(companies=COMPANIES, throttle_s=0, transport=transport)
+        (q,) = provider.snapshot(["VCYT"])
+        assert q.last == 105.0
+    assert crumb_calls["n"] == 1  # cookie+crumb reused across instances

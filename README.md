@@ -109,17 +109,19 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   `category: news` and a published-date window (`EXA_LOOKBACK_HOURS`, default
   36; `EXA_NUM_RESULTS` per query, default 10). Undated results are dropped —
   they can't pass the no-look-ahead gate.
-* **Quotes (Yahoo)** — no key needed. Per ticker: trailing daily history for
-  `avg_volume` + `sigma` (stdev of the last `QUOTES_TRAILING_DAYS` daily %
-  moves, default 20), and today's tape with `includePrePost` for the latest
-  pre-market trade, today's volume and the prior close. RVOL and unusual-move
-  flags stay derived in the fuse stage. A failing symbol is skipped, not
-  fatal; the pull only fails if every ticker does. The endpoint is public but
-  unofficial and rate-limits shared cloud IPs, so requests are paced, 429s
-  get a capped exponential backoff (honoring `Retry-After`), and daily
-  history is cached per UTC day — steady-state refreshes make one live call
-  per ticker. If it still misbehaves, mix back with `BRIEF_QUOTES=fixture`
-  while you pick a paid vendor.
+* **Quotes (Yahoo)** — no key needed. Primary path: ONE batched v7 quote
+  call per refresh prices the whole universe (pre/post-market price,
+  previous close, day volume, 3-month average volume), behind a
+  cookie+crumb handshake done once per process. `sigma` (stdev of the last
+  `QUOTES_TRAILING_DAYS` daily % moves, default 20) comes from per-ticker
+  daily history, cached per UTC day and best-effort — a throttled history
+  call degrades to a conservative default instead of dropping the ticker.
+  If the handshake fails, a per-ticker chart fallback rebuilds the same
+  quote. RVOL and unusual-move flags stay derived in the fuse stage.
+  Yahoo rate-limits shared cloud IPs, so requests are paced and 429s get a
+  capped exponential backoff honoring `Retry-After`. If it still
+  misbehaves, mix back with `BRIEF_QUOTES=fixture` while you pick a paid
+  vendor.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 
@@ -194,7 +196,8 @@ self-refreshing status page (`BRIEF_AUTO_BUILD=0` disables). If you change
 `pipeline/serve.py` is the single production process: it serves the built
 dashboard, serves artifacts with `no-store` freshness, exposes
 `POST /api/ship` and `POST /api/refresh` (the ↻ button), health-checks at
-`/healthz`, and re-runs the pipeline at boot plus every
+`/healthz`, and re-runs the pipeline at boot (in the background — the port
+binds immediately so health checks never wait on a pipeline run) plus every
 `BRIEF_REFRESH_MINUTES` (default 30, `0` disables). Scheduled refreshes never
 send email — only the explicit ship action does. No disk or database needed:
 the artifact is recomputed, not persisted, so free-tier spin-down just means

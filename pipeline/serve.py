@@ -264,9 +264,18 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def _schedule_refreshes() -> None:
+    """Kick off the boot refresh in the BACKGROUND. The port must bind
+    immediately — platform health checks gate deploys on /healthz, and a
+    slow or rate-limited source must never wedge a deploy. Until the first
+    refresh lands, the artifacts already on disk serve (the previous run's,
+    or the committed demo set on a fresh clone)."""
     minutes = float(os.environ.get("BRIEF_REFRESH_MINUTES", "30"))
-    if os.environ.get("BRIEF_REFRESH_ON_BOOT", "1") != "0":
+
+    def boot() -> None:
         print("[serve] boot refresh:", refresh_artifacts()["detail"], file=sys.stderr)
+
+    if os.environ.get("BRIEF_REFRESH_ON_BOOT", "1") != "0":
+        threading.Thread(target=boot, name="boot-refresh", daemon=True).start()
     if minutes <= 0:
         return
 

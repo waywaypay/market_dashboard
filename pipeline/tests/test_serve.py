@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
@@ -19,6 +20,30 @@ from pipeline.serve import (
     _default_to_real_providers,
     resolve_static,
 )
+
+
+def test_boot_refresh_does_not_block_startup(monkeypatch) -> None:
+    """Health checks gate deploys on the port binding — a slow first pipeline
+    run (rate-limited vendor, cold feeds) must never wedge a deploy."""
+    import pipeline.serve as serve
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_refresh() -> dict:
+        started.set()
+        release.wait(timeout=5)
+        return {"ok": True, "detail": "done"}
+
+    monkeypatch.setattr(serve, "refresh_artifacts", slow_refresh)
+    monkeypatch.setenv("BRIEF_REFRESH_MINUTES", "0")
+    monkeypatch.setenv("BRIEF_REFRESH_ON_BOOT", "1")
+
+    t0 = time.monotonic()
+    serve._schedule_refreshes()
+    assert time.monotonic() - t0 < 1.0  # returned before the refresh finished
+    assert started.wait(timeout=5)  # ...and the refresh does run, in the background
+    release.set()
 
 
 def test_server_defaults_to_real_data_pulls(monkeypatch) -> None:
