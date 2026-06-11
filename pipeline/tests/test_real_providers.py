@@ -19,8 +19,19 @@ from pipeline.providers.edgar import SecEdgarProvider
 from pipeline.providers.exa_news import ExaNewsProvider
 from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.util import infer_ticker, strip_tags
-from pipeline.providers.yahoo_quotes import DEFAULT_SIGMA, YahooQuoteProvider
+from pipeline.providers.yahoo_quotes import (
+    _HISTORY_CACHE,
+    DEFAULT_SIGMA,
+    YahooQuoteProvider,
+)
 from pipeline.contracts.universe import RSSFeed
+
+
+@pytest.fixture(autouse=True)
+def _fresh_yahoo_history_cache():
+    _HISTORY_CACHE.clear()
+    yield
+    _HISTORY_CACHE.clear()
 
 NOW = datetime.now(timezone.utc)
 COMPANIES = {"VCYT": "Veracyte", "NTRA": "Natera", "GH": "Guardant Health"}
@@ -362,7 +373,11 @@ def yahoo_handler(req: httpx.Request) -> httpx.Response:
 
 def _yahoo_provider() -> YahooQuoteProvider:
     return YahooQuoteProvider(
-        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(yahoo_handler)
+        companies=COMPANIES,
+        throttle_s=0,
+        max_attempts=1,  # failure tests should not sit in backoff sleeps
+        backoff_s=0,
+        transport=httpx.MockTransport(yahoo_handler),
     )
 
 
@@ -420,6 +435,46 @@ def test_yahoo_provider_reports_flat_when_nothing_traded_today() -> None:
     assert q.last == 104.5  # meta regularMarketPrice — the prior close
     assert q.chg_pct == 0.0  # yesterday's move must not masquerade as today's
     assert q.volume == 0
+
+
+def test_yahoo_provider_backs_off_through_a_429_and_spares_the_mirror() -> None:
+    seen: list[str] = []
+
+    def limited(req: httpx.Request) -> httpx.Response:
+        seen.append(req.url.host)
+        if len(seen) == 1:
+            return httpx.Response(429, text="slow down", headers={"Retry-After": "0"})
+        return yahoo_handler(req)
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        transport=httpx.MockTransport(limited),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 105.0  # retry after backing off succeeded
+    # rate-limited responses must not trigger an immediate mirror hit —
+    # the budget is per source IP, so that only digs the hole deeper
+    assert seen[:2] == ["query1.finance.yahoo.com", "query1.finance.yahoo.com"]
+
+
+def test_yahoo_provider_caches_daily_history_across_runs() -> None:
+    daily_hits = {"n": 0}
+
+    def counting(req: httpx.Request) -> httpx.Response:
+        if dict(req.url.params).get("interval") == "1d":
+            daily_hits["n"] += 1
+        return yahoo_handler(req)
+
+    transport = httpx.MockTransport(counting)
+    for _ in range(2):  # two refreshes = two provider instances, same day
+        provider = YahooQuoteProvider(
+            companies=COMPANIES, throttle_s=0, transport=transport
+        )
+        (q,) = provider.snapshot(["VCYT"])
+        assert q.avg_volume == 1_000_000
+    assert daily_hits["n"] == 1  # sigma/avg_volume reused the cached history
 
 
 def test_yahoo_provider_defaults_sigma_on_short_history() -> None:
