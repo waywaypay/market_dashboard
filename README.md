@@ -76,16 +76,16 @@ Every external dependency sits behind a typed interface in
 | `RSSProvider`        | synthetic feed items               | **`HttpRSSProvider` (working)** — feed URLs in the YAML   |
 | `EdgarProvider`      | synthetic 8-Ks                     | **`SecEdgarProvider` (working)** — free SEC submissions API|
 | `NewsProvider`       | synthetic search results           | **`ExaNewsProvider` (working)** — Exa semantic news search|
-| `QuoteProvider`      | seeded pre-market snapshot         | `MarketDataQuoteProvider` (stub + TODO)                   |
+| `QuoteProvider`      | seeded pre-market snapshot         | **`YahooQuoteProvider` (working)** — keyless Yahoo charts |
 | `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)                   |
 | `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                         |
 
 Selection is env-driven (never LLM-driven). `BRIEF_PROVIDERS=fixture|real`
 sets the global default; `BRIEF_RSS` / `BRIEF_EDGAR` / `BRIEF_NEWS` /
-`BRIEF_QUOTES` / `BRIEF_EMAIL` override per provider, so you can mix real news
-with fixture quotes while the quote vendor is undecided. Provider failures
-surface as `SourceHealth` entries in the artifact (with the reason, rendered
-in the rail), not crashes.
+`BRIEF_QUOTES` / `BRIEF_EMAIL` override per provider, so you can mix sources
+freely (e.g. real quotes with fixture news while keys are pending). Provider
+failures surface as `SourceHealth` entries in the artifact (with the reason,
+rendered in the rail), not crashes.
 
 ### Going real
 
@@ -94,7 +94,7 @@ export SEC_EDGAR_USER_AGENT="yourapp/1.0 you@example.com"  # SEC fair-access pol
 export EXA_API_KEY="..."                                   # https://exa.ai
 export ANTHROPIC_API_KEY="..."                             # real classification
 
-BRIEF_PROVIDERS=real BRIEF_QUOTES=fixture BRIEF_EMAIL=fixture make run-pipeline
+BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
 ```
 
 * **EDGAR** — no key needed. Resolves ticker→CIK, pulls recent 8-K/8-K/A
@@ -109,6 +109,17 @@ BRIEF_PROVIDERS=real BRIEF_QUOTES=fixture BRIEF_EMAIL=fixture make run-pipeline
   `category: news` and a published-date window (`EXA_LOOKBACK_HOURS`, default
   36; `EXA_NUM_RESULTS` per query, default 10). Undated results are dropped —
   they can't pass the no-look-ahead gate.
+* **Quotes (Yahoo)** — no key needed. Per ticker: trailing daily history for
+  `avg_volume` + `sigma` (stdev of the last `QUOTES_TRAILING_DAYS` daily %
+  moves, default 20), and today's tape with `includePrePost` for the latest
+  pre-market trade, today's volume and the prior close. RVOL and unusual-move
+  flags stay derived in the fuse stage. A failing symbol is skipped, not
+  fatal; the pull only fails if every ticker does. The endpoint is public but
+  unofficial and rate-limits shared cloud IPs, so requests are paced, 429s
+  get a capped exponential backoff (honoring `Retry-After`), and daily
+  history is cached per UTC day — steady-state refreshes make one live call
+  per ticker. If it still misbehaves, mix back with `BRIEF_QUOTES=fixture`
+  while you pick a paid vendor.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 
@@ -189,11 +200,19 @@ send email — only the explicit ship action does. No disk or database needed:
 the artifact is recomputed, not persisted, so free-tier spin-down just means
 a fresh brief on wake.
 
-Deploys run on fixtures until you set the secrets in the Render dashboard
-(`SEC_EDGAR_USER_AGENT`, `EXA_API_KEY`, `ANTHROPIC_API_KEY`) and flip
-`BRIEF_PROVIDERS=real`. Note the service is public by default and the ship/
-refresh endpoints are unauthenticated (auth is out of scope by design) —
-keep the URL private or put Render's access controls in front of it.
+Deploys pull real data out of the box — RSS, SEC EDGAR and Yahoo quotes need
+no keys. This holds on **every** deploy path: `render.yaml` sets
+`BRIEF_PROVIDERS=real` for Blueprint deploys, and the server itself defaults
+to real providers when no `BRIEF_*` env is set, which covers manually-created
+services (where `render.yaml` is ignored). Set `BRIEF_PROVIDERS=fixture`
+explicitly for a synthetic demo deploy. Two sources stay dark until you set
+secrets in the Render dashboard:
+`EXA_API_KEY` (news search shows "failed" in the rail until then) and
+`ANTHROPIC_API_KEY` (classification falls back to rule-based tagging until
+then); also set `SEC_EDGAR_USER_AGENT` to your contact per SEC fair-access
+policy. Note the service is public by default and the ship/refresh endpoints
+are unauthenticated (auth is out of scope by design) — keep the URL private
+or put Render's access controls in front of it.
 
 Local dress rehearsal of exactly what Render runs: `make serve` →
 http://localhost:8000.
@@ -203,7 +222,7 @@ http://localhost:8000.
 ```
 pipeline/
   contracts/      Pydantic models — the ONLY cross-stage interface
-  providers/      interfaces + FixtureProvider + Anthropic classifier + real stubs
+  providers/      interfaces + fixtures + real providers (RSS/EDGAR/Exa/Yahoo/Claude)
   stages/         source → process → fuse → output (pure, typed)
   orchestrator.py deterministic DAG + cron-style entrypoint
   ship.py         re-render + send the email for an existing artifact

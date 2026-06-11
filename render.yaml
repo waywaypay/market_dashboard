@@ -6,9 +6,13 @@
 # ship/refresh endpoints. No database, no disk: the artifact is recomputed,
 # never persisted.
 #
-# Default config runs on fixtures (zero keys). To go live, set the secret
-# env vars in the Render dashboard and flip BRIEF_PROVIDERS to "real"
-# (quotes/email stay on fixtures until those vendors are implemented).
+# Default config pulls REAL data with zero keys: RSS feeds, SEC EDGAR and
+# Yahoo Finance quotes. Two sources need secrets set in the Render
+# dashboard to light up — EXA_API_KEY (news search; reports "failed" in
+# the rail until set) and ANTHROPIC_API_KEY (Claude classification; falls
+# back to rule-based tagging until set). Set SEC_EDGAR_USER_AGENT to your
+# contact info per SEC fair-access policy. Email transport has no real
+# vendor yet and stays on fixtures.
 
 services:
   - type: web
@@ -24,9 +28,9 @@ services:
       - key: NODE_VERSION
         value: "22.11.0"
       - key: BRIEF_PROVIDERS
-        value: fixture # flip to "real" once SEC_EDGAR_USER_AGENT / EXA_API_KEY are set
+        value: real # RSS + EDGAR + quotes pull keyless; news needs EXA_API_KEY
       - key: BRIEF_QUOTES
-        value: fixture # no real quote vendor yet
+        value: real # Yahoo Finance chart API — no key required
       - key: BRIEF_EMAIL
         value: fixture # no real email transport yet
       - key: BRIEF_REFRESH_MINUTES

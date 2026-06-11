@@ -1,11 +1,11 @@
-"""Remaining real-provider stubs (quotes + email transport).
+"""Remaining real-provider stub (email transport).
 
-RSS, EDGAR and news search have real implementations now (rss.py, edgar.py,
-exa_news.py). These two still need a vendor decision; they implement the
-vendor-neutral interface and raise NotImplementedError with actionable
-messages. The source stage reports a failed quotes pull as
-SourceHealth(status="failed") and the orchestrator catches email-send
-failures, so running with these selected does not crash — it degrades
+Every data pull has a real implementation now: RSS (rss.py), SEC EDGAR
+(edgar.py), news search (exa_news.py) and quotes (yahoo_quotes.py). Email
+transport — the one outbound side effect — still needs a vendor decision;
+this stub implements the vendor-neutral interface and raises
+NotImplementedError with an actionable message. The orchestrator catches
+email-send failures, so selecting it does not crash a run — it degrades
 honestly.
 
 Interface conformance is tested in pipeline/tests/test_provider_conformance.py.
@@ -13,22 +13,8 @@ Interface conformance is tested in pipeline/tests/test_provider_conformance.py.
 
 from __future__ import annotations
 
-from pipeline.contracts import EmailReceipt, Quote
-from pipeline.providers.base import EmailProvider, QuoteProvider
-
-
-class MarketDataQuoteProvider(QuoteProvider):
-    """TODO(real-provider): pre-market snapshot from any market-data vendor
-    (Polygon, Finnhub, IEX...). Must populate last, chg_pct, volume,
-    avg_volume and sigma (trailing ~20d stdev of daily % moves) — rvol and
-    unusual-move flags are derived downstream, in the deterministic fuse stage.
-    """
-
-    def snapshot(self, tickers: list[str]) -> list[Quote]:
-        raise NotImplementedError(
-            "MarketDataQuoteProvider: implement a market-data vendor integration "
-            "(or run quotes on fixtures: BRIEF_QUOTES=fixture)."
-        )
+from pipeline.contracts import EmailReceipt
+from pipeline.providers.base import EmailProvider
 
 
 class SmtpEmailProvider(EmailProvider):

@@ -15,7 +15,11 @@ One process does everything the local `make dev` split does:
     the explicit ship action
 
 Stdlib only (ThreadingHTTPServer): this is a low-traffic research cockpit,
-not a CDN. Provider selection still comes from the BRIEF_* env vars.
+not a CDN. Provider selection comes from the BRIEF_* env vars, but unlike
+the library default (fixtures), the deployed server defaults to REAL data
+pulls — manually-created Render services never see render.yaml's env vars,
+and a production deploy that silently serves synthetic data is wrong.
+Setting BRIEF_PROVIDERS=fixture explicitly still gives a demo deploy.
 """
 
 from __future__ import annotations
@@ -274,8 +278,23 @@ def _schedule_refreshes() -> None:
     threading.Thread(target=loop, name="brief-refresh", daemon=True).start()
 
 
+def _default_to_real_providers() -> None:
+    """The deployed product pulls real data unless told otherwise.
+
+    This is the only place a default can reach every deploy path: blueprint
+    deploys get env vars from render.yaml, but manually-created services
+    ignore that file entirely and would otherwise boot on fixtures. Explicit
+    BRIEF_* env vars always win (BRIEF_PROVIDERS=fixture is the demo mode).
+    Email transport has no real vendor yet, so it defaults to fixtures —
+    ship writes the .html to out/emails/ instead of failing.
+    """
+    os.environ.setdefault("BRIEF_PROVIDERS", "real")
+    os.environ.setdefault("BRIEF_EMAIL", "fixture")
+
+
 def main() -> int:
     os.chdir(REPO)  # relative paths (universes/, out/emails) resolve from the repo
+    _default_to_real_providers()
     port = int(os.environ.get("PORT", "8000"))
     ensure_web_built()  # no-op when the deploy build already produced dist/
     _schedule_refreshes()
