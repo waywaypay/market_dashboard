@@ -15,7 +15,7 @@ services:
     name: pre-market-read
     runtime: python
     plan: free
-    buildCommand: pip install -e . && cd web && npm ci && npm run build
+    buildCommand: pip install -r requirements.txt && cd web && npm ci && npm run build
     startCommand: python -m pipeline.serve
     healthCheckPath: /healthz
     envVars:

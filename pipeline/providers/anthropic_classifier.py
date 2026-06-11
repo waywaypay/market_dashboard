@@ -5,8 +5,9 @@ Contract (see ClassifierProvider): strict JSON only, validated against
 to rule-based tagging. The run never crashes because of the LLM, and the LLM
 never decides control flow — it only fills in per-item fields + the tldr.
 
-Requires `pip install anthropic` and ANTHROPIC_API_KEY. The import is lazy so
-the rest of the pipeline runs with zero keys installed.
+Requires ANTHROPIC_API_KEY (the SDK ships with the project's dependencies).
+The import stays lazy/defensive so a broken SDK install can never take the
+fixture path down with it.
 """
 
 from __future__ import annotations

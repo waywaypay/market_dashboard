@@ -8,17 +8,21 @@ dependencies = [
     "PyYAML>=6.0",
     "httpx>=0.27",      # real providers (EDGAR, RSS, Exa news)
     "feedparser>=6.0",  # real RSS provider
+    "anthropic>=0.69",  # real classifier (only used when ANTHROPIC_API_KEY is set)
 ]
 
 [project.optional-dependencies]
-# The Anthropic SDK is only needed when BRIEF_CLASSIFIER=anthropic (real Claude
-# process stage). The pipeline runs end-to-end on fixtures without it.
-anthropic = ["anthropic>=0.69"]
-dev = ["pytest>=8.0", "anthropic>=0.69"]
+dev = ["pytest>=8.0"]
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+# Render's default build for a manually-created Python service is
+# `poetry install`; Poetry ignores [tool.setuptools] and needs its own
+# package pointer or it fails with "No file/folder found for package".
+[tool.poetry]
+packages = [{ include = "pipeline" }]
 
 [tool.setuptools.packages.find]
 include = ["pipeline*"]
