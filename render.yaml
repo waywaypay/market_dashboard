@@ -9,7 +9,7 @@
 # Default config pulls REAL data with zero keys: RSS feeds, SEC EDGAR and
 # Yahoo Finance quotes. Two sources need secrets set in the Render
 # dashboard to light up — EXA_API_KEY (news search; reports "failed" in
-# the rail until set) and ANTHROPIC_API_KEY (Claude classification; falls
+# the rail until set) and VENICE_API_KEY (Venice AI classification; falls
 # back to rule-based tagging until set). Set SEC_EDGAR_USER_AGENT to your
 # contact info per SEC fair-access policy. Email transport has no real
 # vendor yet and stays on fixtures.
@@ -39,5 +39,5 @@ services:
         sync: false # set in dashboard: "yourapp/1.0 you@example.com"
       - key: EXA_API_KEY
         sync: false # set in dashboard
-      - key: ANTHROPIC_API_KEY
+      - key: VENICE_API_KEY
         sync: false # set in dashboard (enables the real classifier via BRIEF_CLASSIFIER=auto)

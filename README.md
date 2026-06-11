@@ -8,7 +8,7 @@ drill in and ship a morning email ("First Read").
 Two fused layers:
 
 1. **News brief** — RSS + SEC EDGAR + news search, deduped, then classified and
-   summarized by Claude in a single batched call (category, materiality 1–5,
+   summarized by Venice AI in a single batched call (category, materiality 1–5,
    subject-relevance, house-style summary, one-line TL;DR).
 2. **Market analytics** — pre-market price/volume per ticker, unusual-move
    detection (`abs(%chg) ≥ 2σ` or `RVOL ≥ 2`), and the signature feature:
@@ -51,7 +51,7 @@ universes/*.yaml ──► orchestrator (deterministic DAG, no LLM routing)
    source stage        │  parallel fetch behind vendor-neutral interfaces:
                        │  RSS · EDGAR · news search · quotes
                        │  → look-ahead filter → dedupe (URL + fuzzy title) → RVOL
-   process stage       │  ONE batched Claude call → strict JSON Classification
+   process stage       │  ONE batched Venice AI call → strict JSON Classification
                        │  (validate → retry once → rule-based fallback; never crashes)
    fuse stage          │  flag unusual moves; attribute driver_item_id;
                        │  attach price_reaction badges  (pure Python, no LLM)
@@ -77,7 +77,7 @@ Every external dependency sits behind a typed interface in
 | `EdgarProvider`      | synthetic 8-Ks                     | **`SecEdgarProvider` (working)** — free SEC submissions API|
 | `NewsProvider`       | synthetic search results           | **`ExaNewsProvider` (working)** — Exa semantic news search|
 | `QuoteProvider`      | seeded pre-market snapshot         | **`YahooQuoteProvider` (working)** — keyless Yahoo charts |
-| `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)                   |
+| `ClassifierProvider` | canned labels + rule-based backup  | `VeniceClassifierProvider` (working)                   |
 | `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                         |
 
 Selection is env-driven (never LLM-driven). `BRIEF_PROVIDERS=fixture|real`
@@ -92,7 +92,7 @@ rendered in the rail), not crashes.
 ```sh
 export SEC_EDGAR_USER_AGENT="yourapp/1.0 you@example.com"  # SEC fair-access policy
 export EXA_API_KEY="..."                                   # https://exa.ai
-export ANTHROPIC_API_KEY="..."                             # real classification
+export VENICE_API_KEY="..."                                # real classification
 
 BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
 ```
@@ -122,8 +122,8 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   capped exponential backoff honoring `Retry-After`. If it still
   misbehaves, mix back with `BRIEF_QUOTES=fixture` while you pick a paid
   vendor.
-* **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
-  `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
+* **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Venice AI when
+  `VENICE_API_KEY` is set, else fixtures — same eval gates either way.
 
 The cross-source dedupe, ticker inference, look-ahead guard, fuse attribution,
 and all eval gates apply identically to real data. Wire-format correctness is
@@ -143,8 +143,8 @@ See `universes/diagnostics.yaml` for the annotated reference.
   with gold `category` / materiality-band / `is_subject_relevant` labels per
   universe. Asserts the classifier's output validates against the contract,
   stays inside the configured taxonomy, and matches gold within tolerance —
-  tight bars for the fixture/Claude engine, a looser floor for the rule-based
-  fallback. With `ANTHROPIC_API_KEY` set, the same gate exercises real Claude.
+  tight bars for the fixture/Venice engine, a looser floor for the rule-based
+  fallback. With `VENICE_API_KEY` set, the same gate exercises real Venice AI.
 * **Fuse attribution**: deterministic checks that each seeded unusual move is
   flagged for the right reason (`sigma`/`rvol`) and attributed to the right
   driver — including the case where a lower-materiality same-ticker story must
@@ -211,7 +211,7 @@ services (where `render.yaml` is ignored). Set `BRIEF_PROVIDERS=fixture`
 explicitly for a synthetic demo deploy. Two sources stay dark until you set
 secrets in the Render dashboard:
 `EXA_API_KEY` (news search shows "failed" in the rail until then) and
-`ANTHROPIC_API_KEY` (classification falls back to rule-based tagging until
+`VENICE_API_KEY` (classification falls back to rule-based tagging until
 then); also set `SEC_EDGAR_USER_AGENT` to your contact per SEC fair-access
 policy. Note the service is public by default and the ship/refresh endpoints
 are unauthenticated (auth is out of scope by design) — keep the URL private
@@ -225,7 +225,7 @@ http://localhost:8000.
 ```
 pipeline/
   contracts/      Pydantic models — the ONLY cross-stage interface
-  providers/      interfaces + fixtures + real providers (RSS/EDGAR/Exa/Yahoo/Claude)
+  providers/      interfaces + fixtures + real providers (RSS/EDGAR/Exa/Yahoo/Venice)
   stages/         source → process → fuse → output (pure, typed)
   orchestrator.py deterministic DAG + cron-style entrypoint
   ship.py         re-render + send the email for an existing artifact

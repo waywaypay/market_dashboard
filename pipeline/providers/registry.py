@@ -5,7 +5,7 @@
                      itself to real so deploys never silently serve fixtures)
     BRIEF_RSS / BRIEF_EDGAR / BRIEF_NEWS / BRIEF_QUOTES / BRIEF_EMAIL
                      fixture | real               — per-provider override
-    BRIEF_CLASSIFIER auto (default) | fixture | rules | anthropic
+    BRIEF_CLASSIFIER auto (default) | fixture | rules | venice
 
 Real implementations exist for RSS (feed URLs in the universe YAML), EDGAR
 (free; set SEC_EDGAR_USER_AGENT per SEC fair-access policy), news search
@@ -14,14 +14,13 @@ transport is still a stub — keep it on fixtures while running real data:
 
     BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
 
-"auto" classification uses Anthropic when ANTHROPIC_API_KEY is set and the SDK
-is installed, otherwise the fixture classifier — so the project always runs
-with zero keys and upgrades itself when keys appear.
+"auto" classification uses Venice AI when VENICE_API_KEY is set, otherwise the
+fixture classifier — so the project always runs with zero keys and upgrades
+itself when keys appear.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -59,20 +58,18 @@ class ProviderSet:
     email: EmailProvider
 
 
-def _anthropic_available() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY")) and (
-        importlib.util.find_spec("anthropic") is not None
-    )
+def _venice_available() -> bool:
+    return bool(os.environ.get("VENICE_API_KEY"))
 
 
 def build_classifier(universe_id: str) -> ClassifierProvider:
     mode = os.environ.get("BRIEF_CLASSIFIER", "auto").lower()
     if mode == "auto":
-        mode = "anthropic" if _anthropic_available() else "fixture"
-    if mode == "anthropic":
-        from pipeline.providers.anthropic_classifier import AnthropicClassifierProvider
+        mode = "venice" if _venice_available() else "fixture"
+    if mode == "venice":
+        from pipeline.providers.venice_classifier import VeniceClassifierProvider
 
-        return AnthropicClassifierProvider()
+        return VeniceClassifierProvider()
     if mode == "rules":
         return RulesClassifierProvider()
     if mode == "fixture":

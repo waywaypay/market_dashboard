@@ -1,10 +1,10 @@
 """Vendor-neutral provider interfaces.
 
 Every external dependency (RSS, SEC EDGAR, news search, stock quotes, email
-send, Claude) sits behind one of these typed interfaces. The app runs
+send, Venice AI) sits behind one of these typed interfaces. The app runs
 end-to-end with zero API keys against the Fixture* reference implementations;
 real providers are added by implementing the same interface (see
-real_stubs.py and anthropic_classifier.py).
+real_stubs.py and venice_classifier.py).
 """
 
 from __future__ import annotations
@@ -47,11 +47,11 @@ class ClassifierResult(BaseModel):
 
     tldr: str
     classifications: list[Classification]
-    engine: str  # "fixture" | "rules" | "anthropic" — provenance only
+    engine: str  # "fixture" | "rules" | "venice" — provenance only
 
 
 class ClassifierProvider(ABC):
-    """The brain. Real implementation = ONE batched Anthropic API call per run.
+    """The brain. Real implementation = ONE batched Venice AI API call per run.
 
     Implementations must never raise on bad model output: validate, retry
     once, then fall back to rule-based tagging (see rules.py). A run never
