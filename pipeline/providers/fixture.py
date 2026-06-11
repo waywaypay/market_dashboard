@@ -120,13 +120,19 @@ class FixtureClassifierProvider(ClassifierProvider):
         data = _load(self.universe_id, "classifications.json")
         by_item: dict[str, dict] = data["by_item"]
         out: list[Classification] = []
+        canned_hits = 0
         for item in items:
             canned = by_item.get(item.id)
             if canned is not None:
+                canned_hits += 1
                 out.append(Classification(item_id=item.id, **canned))
             else:
                 out.append(rules.classify_item(item, universe))
-        return ClassifierResult(tldr=data["tldr"], classifications=out, engine="fixture")
+        # The canned tldr describes the fixture stories. If nothing matched
+        # (e.g. real sources with no ANTHROPIC_API_KEY), it would headline
+        # synthetic events over real items — compose deterministically instead.
+        tldr = data["tldr"] if canned_hits else compose_tldr_fallback(out, universe)
+        return ClassifierResult(tldr=tldr, classifications=out, engine="fixture")
 
 
 class RulesClassifierProvider(ClassifierProvider):

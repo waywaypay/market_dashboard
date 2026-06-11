@@ -6,11 +6,11 @@
     BRIEF_CLASSIFIER auto (default) | fixture | rules | anthropic
 
 Real implementations exist for RSS (feed URLs in the universe YAML), EDGAR
-(free; set SEC_EDGAR_USER_AGENT per SEC fair-access policy) and news search
-(Exa; set EXA_API_KEY). Quotes and email transport are still stubs — mix them
-back to fixtures while running real news:
+(free; set SEC_EDGAR_USER_AGENT per SEC fair-access policy), news search
+(Exa; set EXA_API_KEY) and quotes (Yahoo Finance chart API; no key). Email
+transport is still a stub — keep it on fixtures while running real data:
 
-    BRIEF_PROVIDERS=real BRIEF_QUOTES=fixture BRIEF_EMAIL=fixture make run-pipeline
+    BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
 
 "auto" classification uses Anthropic when ANTHROPIC_API_KEY is set and the SDK
 is installed, otherwise the fixture classifier — so the project always runs
@@ -109,9 +109,9 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
         return ExaNewsProvider(companies=universe.companies, watch=universe.private_watch)
 
     def real_quotes() -> QuoteProvider:
-        from pipeline.providers.real_stubs import MarketDataQuoteProvider
+        from pipeline.providers.yahoo_quotes import YahooQuoteProvider
 
-        return MarketDataQuoteProvider()
+        return YahooQuoteProvider(companies=universe.companies)
 
     def real_email() -> EmailProvider:
         from pipeline.providers.real_stubs import SmtpEmailProvider

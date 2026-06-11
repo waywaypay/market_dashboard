@@ -1,13 +1,15 @@
 """Real-provider tests against mocked HTTP transports (httpx.MockTransport).
 
 These pin the wire formats each integration depends on — SEC submissions API
-shapes, RSS/Atom parsing, the Exa /search request/response — without touching
-the network, so they run in CI exactly like everything else.
+shapes, RSS/Atom parsing, the Exa /search request/response, the Yahoo chart
+payload — without touching the network, so they run in CI exactly like
+everything else.
 """
 
 from __future__ import annotations
 
 import json
+import statistics
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -17,6 +19,7 @@ from pipeline.providers.edgar import SecEdgarProvider
 from pipeline.providers.exa_news import ExaNewsProvider
 from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.util import infer_ticker, strip_tags
+from pipeline.providers.yahoo_quotes import DEFAULT_SIGMA, YahooQuoteProvider
 from pipeline.contracts.universe import RSSFeed
 
 NOW = datetime.now(timezone.utc)
@@ -261,3 +264,145 @@ def test_exa_provider_requires_key_and_surfaces_http_errors() -> None:
     )
     with pytest.raises(RuntimeError, match="HTTP 401"):
         boom.search(["VCYT"], [])
+
+
+# -------------------------------------------------------------------- Yahoo quotes
+
+DAY = timedelta(days=1)
+
+# 21 completed sessions; today's in-progress bar is appended by the payload
+# builders and must be excluded from every trailing statistic.
+DAILY_CLOSES = [100.0 + (i % 7) for i in range(21)]
+DAILY_VOLUMES = [1_000_000] * 21
+
+
+def _epoch(dt: datetime) -> int:
+    return int(dt.timestamp())
+
+
+def _daily_payload(symbol: str) -> dict:
+    timestamps = [_epoch(NOW - (21 - i) * DAY) for i in range(21)] + [_epoch(NOW)]
+    return {
+        "chart": {
+            "result": [
+                {
+                    "meta": {"symbol": symbol, "shortName": f"{symbol} Inc."},
+                    "timestamp": timestamps,
+                    "indicators": {
+                        "quote": [
+                            {
+                                # today's partial bar: a wild close + tiny volume
+                                # that would wreck sigma/avg_volume if included
+                                "close": DAILY_CLOSES + [999.0],
+                                "volume": DAILY_VOLUMES + [77],
+                            }
+                        ]
+                    },
+                }
+            ],
+            "error": None,
+        }
+    }
+
+
+def _live_payload(symbol: str) -> dict:
+    bars = [_epoch(NOW - timedelta(minutes=m)) for m in (25, 20, 15, 10, 5)]
+    return {
+        "chart": {
+            "result": [
+                {
+                    "meta": {
+                        "symbol": symbol,
+                        "shortName": f"{symbol} Inc.",
+                        "chartPreviousClose": 100.0,
+                        "regularMarketPrice": 104.5,
+                        "regularMarketVolume": 0,  # pre-open: regular tape empty
+                    },
+                    "timestamp": bars,
+                    "indicators": {
+                        "quote": [
+                            {
+                                "close": [101.0, None, 103.0, None, 105.0],
+                                "volume": [1000, None, 2000, None, 500],
+                            }
+                        ]
+                    },
+                }
+            ],
+            "error": None,
+        }
+    }
+
+
+def yahoo_handler(req: httpx.Request) -> httpx.Response:
+    assert "Mozilla" in req.headers.get("User-Agent", "")  # Yahoo rejects bot UAs
+    symbol = req.url.path.rsplit("/", 1)[-1]
+    params = dict(req.url.params)
+    if symbol == "BOOM":
+        return httpx.Response(500, text="upstream exploded")
+    if symbol == "GONE":  # Yahoo's shape for unknown/delisted symbols
+        return httpx.Response(
+            404,
+            json={
+                "chart": {
+                    "result": None,
+                    "error": {
+                        "code": "Not Found",
+                        "description": "No data found, symbol may be delisted",
+                    },
+                }
+            },
+        )
+    if params.get("interval") == "1d":
+        assert params.get("range") == "3mo"
+        return httpx.Response(200, json=_daily_payload(symbol))
+    assert params.get("includePrePost") == "true"  # pre-market IS the product
+    return httpx.Response(200, json=_live_payload(symbol))
+
+
+def _yahoo_provider() -> YahooQuoteProvider:
+    return YahooQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(yahoo_handler)
+    )
+
+
+def test_yahoo_provider_builds_premarket_quote_from_chart_api() -> None:
+    (q,) = _yahoo_provider().snapshot(["VCYT"])
+    assert q.ticker == "VCYT" and q.name == "Veracyte"  # universe name beats Yahoo's
+    assert q.last == 105.0  # latest pre-market bar; null bars skipped
+    assert q.chg_pct == 5.0  # vs chartPreviousClose 100.0
+    assert q.volume == 3500  # bar sum while the regular tape is still 0
+    assert q.avg_volume == 1_000_000  # today's partial 77-share bar excluded
+    moves = [(b - a) / a * 100.0 for a, b in zip(DAILY_CLOSES, DAILY_CLOSES[1:])]
+    assert q.sigma == pytest.approx(statistics.stdev(moves[-20:]), abs=0.01)
+    assert q.flagged is False and q.rvol is None  # derived downstream, not here
+
+
+def test_yahoo_provider_skips_failing_tickers_and_keeps_the_rest() -> None:
+    quotes = _yahoo_provider().snapshot(["BOOM", "VCYT", "GONE"])
+    assert [q.ticker for q in quotes] == ["VCYT"]
+
+
+def test_yahoo_provider_raises_only_when_every_ticker_fails() -> None:
+    with pytest.raises(RuntimeError, match="all 2 tickers"):
+        _yahoo_provider().snapshot(["BOOM", "GONE"])
+    assert _yahoo_provider().snapshot([]) == []
+
+
+def test_yahoo_provider_defaults_sigma_on_short_history() -> None:
+    def thin_handler(req: httpx.Request) -> httpx.Response:
+        if dict(req.url.params).get("interval") == "1d":
+            payload = _daily_payload("VCYT")
+            result = payload["chart"]["result"][0]
+            result["timestamp"] = result["timestamp"][-4:]  # 3 completed + today
+            quote = result["indicators"]["quote"][0]
+            quote["close"], quote["volume"] = quote["close"][-4:], quote["volume"][-4:]
+            return httpx.Response(200, json=payload)
+        return httpx.Response(200, json=_live_payload("VCYT"))
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(thin_handler)
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.sigma == DEFAULT_SIGMA  # 2 trailing moves -> not estimable
+    assert q.avg_volume == 1_000_000
