@@ -78,6 +78,23 @@ def test_ship_rejects_bad_universe_id(server_port: int) -> None:
         assert json.loads(err.read())["ok"] is False
 
 
+def test_missing_dist_serves_self_heal_page(monkeypatch, tmp_path, server_port: int) -> None:
+    """An under-configured deploy (no web/dist) must answer with the status
+    page, not a bare error — and never spawn npm when auto-build is off."""
+    import pipeline.serve as serve
+
+    monkeypatch.setattr(serve, "DIST", tmp_path / "nodist")
+    monkeypatch.setenv("BRIEF_AUTO_BUILD", "0")
+    try:
+        _get(server_port, "/")
+        raise AssertionError("expected HTTP 503")
+    except urllib.error.HTTPError as err:
+        assert err.code == 503
+        body = err.read().decode()
+        assert "Build Command" in body  # tells the operator the durable fix
+        assert "npm ci" in body
+
+
 def test_artifact_prefixes_cover_everything_the_pipeline_writes() -> None:
     # write_artifacts produces exactly these three shapes; if that changes,
     # this test forces the server's freshness overlay to follow
