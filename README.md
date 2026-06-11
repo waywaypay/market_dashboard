@@ -196,7 +196,8 @@ self-refreshing status page (`BRIEF_AUTO_BUILD=0` disables). If you change
 `pipeline/serve.py` is the single production process: it serves the built
 dashboard, serves artifacts with `no-store` freshness, exposes
 `POST /api/ship` and `POST /api/refresh` (the ↻ button), health-checks at
-`/healthz`, and re-runs the pipeline at boot plus every
+`/healthz`, and re-runs the pipeline at boot (in the background — the port
+binds immediately so health checks never wait on a pipeline run) plus every
 `BRIEF_REFRESH_MINUTES` (default 30, `0` disables). Scheduled refreshes never
 send email — only the explicit ship action does. No disk or database needed:
 the artifact is recomputed, not persisted, so free-tier spin-down just means

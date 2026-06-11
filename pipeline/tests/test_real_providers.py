@@ -613,6 +613,29 @@ def test_yahoo_provider_ships_prices_even_when_history_is_throttled() -> None:
     assert q.avg_volume == 1_000_000  # v7's 3-month average fills in
 
 
+def test_yahoo_provider_respects_its_time_budget() -> None:
+    chart_hits = {"n": 0}
+
+    def black_hole(req: httpx.Request) -> httpx.Response:
+        if "/v8/finance/chart/" not in req.url.path:
+            return httpx.Response(404, text="no v7 here")
+        chart_hits["n"] += 1
+        return httpx.Response(429, text="slow down", headers={"Retry-After": "60"})
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=999,  # would sleep ~forever if the budget didn't gate retries
+        deadline_s=0,
+        transport=httpx.MockTransport(black_hole),
+    )
+    with pytest.raises(RuntimeError, match="all 2 tickers"):
+        provider.snapshot(["VCYT", "NTRA"])
+    # over budget: history skipped, one live attempt for the first ticker,
+    # remaining tickers dropped — a wedged vendor can't wedge the refresh
+    assert chart_hits["n"] == 1
+
+
 def test_yahoo_provider_does_the_crumb_handshake_once_per_process() -> None:
     crumb_calls = {"n": 0}
     base = _yahoo_routes({"VCYT": _v7_row("VCYT")})
