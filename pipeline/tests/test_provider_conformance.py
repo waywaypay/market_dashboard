@@ -1,5 +1,5 @@
-"""Interface conformance: every provider (fixture + real stubs) implements the
-vendor-neutral contract with the right shape. The real stubs raise
+"""Interface conformance: every provider (fixture + real + stub) implements the
+vendor-neutral contract with the right shape. The remaining stub raises
 NotImplementedError but must still satisfy the interface and accept the right
 argument types — so a real integration slots in without touching any stage.
 """
@@ -19,17 +19,20 @@ from pipeline.providers.base import (
     RSSProvider,
 )
 from pipeline.providers.fixture import (
+    FixtureClassifierProvider,
     FixtureEdgarProvider,
     FixtureEmailProvider,
     FixtureNewsProvider,
     FixtureQuoteProvider,
     FixtureRSSProvider,
     RulesClassifierProvider,
+    _load,
 )
 from pipeline.providers.edgar import SecEdgarProvider
 from pipeline.providers.exa_news import ExaNewsProvider
-from pipeline.providers.real_stubs import MarketDataQuoteProvider, SmtpEmailProvider
+from pipeline.providers.real_stubs import SmtpEmailProvider
 from pipeline.providers.rss import HttpRSSProvider
+from pipeline.providers.yahoo_quotes import YahooQuoteProvider
 from pipeline.contracts.universe import RSSFeed
 
 NOW = datetime(2026, 6, 10, 13, 45, tzinfo=timezone.utc)
@@ -48,8 +51,8 @@ def test_real_providers_subclass_interfaces() -> None:
     assert issubclass(HttpRSSProvider, RSSProvider)
     assert issubclass(SecEdgarProvider, EdgarProvider)
     assert issubclass(ExaNewsProvider, NewsProvider)
-    # remaining stubs still satisfy the interface (vendor TBD)
-    assert issubclass(MarketDataQuoteProvider, QuoteProvider)
+    assert issubclass(YahooQuoteProvider, QuoteProvider)
+    # remaining stub still satisfies the interface (vendor TBD)
     assert issubclass(SmtpEmailProvider, EmailProvider)
 
 
@@ -90,13 +93,23 @@ def test_rules_classifier_is_total(tmp_path) -> None:
     assert result.classifications[0].category in universe.categories
 
 
-@pytest.mark.parametrize(
-    "provider,method,args",
-    [
-        (MarketDataQuoteProvider(), "snapshot", (["VCYT"],)),
-        (SmtpEmailProvider(), "send", (["a@b.com"], "subj", "<html></html>")),
-    ],
-)
-def test_remaining_stubs_raise_actionable_not_implemented(provider, method, args) -> None:
+def test_fixture_classifier_composes_tldr_when_no_canned_items_match() -> None:
+    """Real items (ids absent from the canned table) must never inherit the
+    synthetic fixture tldr — that would headline fabricated events."""
+    from pipeline.contracts.universe import load_universe
+    from pipeline.evals.harness import UNIVERSES_DIR
+
+    universe = load_universe(UNIVERSES_DIR / "diagnostics.yaml")
+    item = RawItem(
+        id="real-pull-001", source="news", feed="Reuters", url="https://r/1",
+        title="Veracyte wins expanded Medicare coverage", raw_text="Coverage news.",
+        ts=NOW, ticker_guess="VCYT",
+    )
+    result = FixtureClassifierProvider("diagnostics").classify([item], universe)
+    canned_tldr = _load("diagnostics", "classifications.json")["tldr"]
+    assert result.tldr.strip() and result.tldr != canned_tldr
+
+
+def test_remaining_stub_raises_actionable_not_implemented() -> None:
     with pytest.raises(NotImplementedError):
-        getattr(provider, method)(*args)
+        SmtpEmailProvider().send(["a@b.com"], "subj", "<html></html>")
