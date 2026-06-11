@@ -25,7 +25,7 @@ def test_no_item_after_generated_at(universe_id: str, tmp_path) -> None:
         now=EVAL_NOW,
         web_public=tmp_path,
         default=False,
-        providers=build_providers(universe_id, EVAL_NOW),
+        providers=build_providers(universe, EVAL_NOW),
         send_email=False,
     )
 
@@ -54,7 +54,7 @@ def test_seeded_future_item_is_dropped(universe_id: str, tmp_path) -> None:
         now=EVAL_NOW,
         web_public=tmp_path,
         default=False,
-        providers=build_providers(universe_id, EVAL_NOW),
+        providers=build_providers(universe, EVAL_NOW),
         send_email=False,
     )
     future_id = FUTURE_ITEMS[universe_id]

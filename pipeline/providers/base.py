@@ -14,12 +14,13 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel
 
 from pipeline.contracts import EmailReceipt, Quote, RawItem, UniverseConfig
+from pipeline.contracts.universe import RSSFeed
 from pipeline.contracts.models import Classification
 
 
 class RSSProvider(ABC):
     @abstractmethod
-    def fetch(self, feeds: list[str]) -> list[RawItem]:
+    def fetch(self, feeds: list[RSSFeed]) -> list[RawItem]:
         """Pull recent entries from the configured feeds."""
 
 

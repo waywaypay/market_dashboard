@@ -53,7 +53,7 @@ def run_universe(
     providers: ProviderSet | None = None,
     send_email: bool = True,
 ) -> DailyBrief:
-    providers = providers or build_providers(universe.id, now)
+    providers = providers or build_providers(universe, now)
 
     src = run_source(universe, providers, now)
     proc = run_process(src.items, universe, providers.classifier)
@@ -73,10 +73,13 @@ def run_universe(
     written = write_artifacts(brief, web_public, default=default)
     receipt_note = "email skipped"
     if send_email:
-        receipt = providers.email.send(
-            universe.delivery.recipients, email_subject(brief), render_email(brief)
-        )
-        receipt_note = receipt.detail
+        try:
+            receipt = providers.email.send(
+                universe.delivery.recipients, email_subject(brief), render_email(brief)
+            )
+            receipt_note = receipt.detail
+        except Exception as exc:  # transport failure must not kill the artifact
+            receipt_note = f"email send failed: {type(exc).__name__}: {exc}"
 
     print(
         f"[{universe.id}] {brief.counts.total_items} items "

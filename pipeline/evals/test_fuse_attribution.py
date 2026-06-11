@@ -29,7 +29,7 @@ def _fuse(universe_id: str):
     """Drive source -> process -> fuse so rvol is derived exactly as in prod
     (the source stage owns rvol; calling snapshot() directly would skip it)."""
     universe = load_eval_universe(universe_id)
-    providers = build_providers(universe_id, EVAL_NOW)
+    providers = build_providers(universe, EVAL_NOW)
     src = run_source(universe, providers, EVAL_NOW)
     proc = run_process(src.items, universe, build_classifier(universe_id))
     return universe, run_fuse(proc.items, src.quotes, universe)

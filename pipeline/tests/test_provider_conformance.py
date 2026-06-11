@@ -26,13 +26,11 @@ from pipeline.providers.fixture import (
     FixtureRSSProvider,
     RulesClassifierProvider,
 )
-from pipeline.providers.real_stubs import (
-    HttpRSSProvider,
-    MarketDataQuoteProvider,
-    SearchNewsProvider,
-    SecEdgarProvider,
-    SmtpEmailProvider,
-)
+from pipeline.providers.edgar import SecEdgarProvider
+from pipeline.providers.exa_news import ExaNewsProvider
+from pipeline.providers.real_stubs import MarketDataQuoteProvider, SmtpEmailProvider
+from pipeline.providers.rss import HttpRSSProvider
+from pipeline.contracts.universe import RSSFeed
 
 NOW = datetime(2026, 6, 10, 13, 45, tzinfo=timezone.utc)
 
@@ -45,16 +43,18 @@ def test_fixture_providers_subclass_interfaces() -> None:
     assert issubclass(FixtureEmailProvider, EmailProvider)
 
 
-def test_real_stubs_subclass_interfaces() -> None:
+def test_real_providers_subclass_interfaces() -> None:
+    # implemented integrations slot in behind the same vendor-neutral contracts
     assert issubclass(HttpRSSProvider, RSSProvider)
     assert issubclass(SecEdgarProvider, EdgarProvider)
-    assert issubclass(SearchNewsProvider, NewsProvider)
+    assert issubclass(ExaNewsProvider, NewsProvider)
+    # remaining stubs still satisfy the interface (vendor TBD)
     assert issubclass(MarketDataQuoteProvider, QuoteProvider)
     assert issubclass(SmtpEmailProvider, EmailProvider)
 
 
 def test_fixture_rss_returns_rawitems() -> None:
-    items = FixtureRSSProvider("diagnostics", NOW).fetch(["GenomeWeb"])
+    items = FixtureRSSProvider("diagnostics", NOW).fetch([RSSFeed(label="GenomeWeb")])
     assert items and all(isinstance(i, RawItem) for i in items)
     assert all(i.source == "rss" for i in items)
 
@@ -93,13 +93,10 @@ def test_rules_classifier_is_total(tmp_path) -> None:
 @pytest.mark.parametrize(
     "provider,method,args",
     [
-        (HttpRSSProvider(), "fetch", (["GenomeWeb"],)),
-        (SecEdgarProvider(), "fetch", (["VCYT"],)),
-        (SearchNewsProvider(), "search", (["VCYT"], ["genomics"])),
         (MarketDataQuoteProvider(), "snapshot", (["VCYT"],)),
         (SmtpEmailProvider(), "send", (["a@b.com"], "subj", "<html></html>")),
     ],
 )
-def test_real_stubs_raise_actionable_not_implemented(provider, method, args) -> None:
+def test_remaining_stubs_raise_actionable_not_implemented(provider, method, args) -> None:
     with pytest.raises(NotImplementedError):
         getattr(provider, method)(*args)

@@ -18,6 +18,7 @@ from pathlib import Path
 
 from pipeline.contracts import EmailReceipt, Quote, RawItem, UniverseConfig
 from pipeline.contracts.models import Classification
+from pipeline.contracts.universe import RSSFeed
 from pipeline.providers import rules
 from pipeline.providers.base import (
     ClassifierProvider,
@@ -68,9 +69,10 @@ class FixtureRSSProvider(RSSProvider):
     def __init__(self, universe_id: str, now: datetime):
         self.universe_id, self.now = universe_id, now
 
-    def fetch(self, feeds: list[str]) -> list[RawItem]:
+    def fetch(self, feeds: list[RSSFeed]) -> list[RawItem]:
+        labels = {f.label for f in feeds}
         items = _raw_items(self.universe_id, "rss", self.now)
-        return [i for i in items if i.feed in feeds] or items
+        return [i for i in items if i.feed in labels] or items
 
 
 class FixtureEdgarProvider(EdgarProvider):

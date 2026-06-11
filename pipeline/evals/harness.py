@@ -43,7 +43,7 @@ def load_eval_universe(universe_id: str) -> UniverseConfig:
 
 def fixture_raw_items(universe: UniverseConfig) -> list[RawItem]:
     """Deduped, look-ahead-filtered items as the process stage would receive them."""
-    providers = build_providers(universe.id, EVAL_NOW)
+    providers = build_providers(universe, EVAL_NOW)
     return run_source(universe, providers, EVAL_NOW).items
 
 

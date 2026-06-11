@@ -27,7 +27,7 @@ def test_orchestrator_produces_valid_brief(universe_id: str, tmp_path) -> None:
         now=EVAL_NOW,
         web_public=tmp_path,
         default=True,
-        providers=build_providers(universe_id, EVAL_NOW),
+        providers=build_providers(universe, EVAL_NOW),
         send_email=False,
     )
     # round-trips through the contract (write -> read -> validate)
@@ -66,7 +66,7 @@ def test_switching_universe_reskins_from_config_alone(tmp_path) -> None:
         universe = load_universe(UNIVERSES_DIR / f"{uid}.yaml")
         briefs[uid] = run_universe(
             universe, now=EVAL_NOW, web_public=tmp_path, default=False,
-            providers=build_providers(uid, EVAL_NOW), send_email=False,
+            providers=build_providers(universe, EVAL_NOW), send_email=False,
         )
     assert briefs["diagnostics"].categories != briefs["fintech"].categories
     assert briefs["diagnostics"].subject_ticker != briefs["fintech"].subject_ticker

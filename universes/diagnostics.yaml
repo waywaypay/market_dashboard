@@ -15,7 +15,15 @@ peers:
   - { ticker: BLLN, name: BillionToOne }
 private_watch: [ ArteraAI ]
 sector_keywords: [ diagnostics, genomics, "digital pathology", "liquid biopsy", MRD, reimbursement, LDT ]
-rss_feeds: [ GenomeWeb, "Precision Oncology News", STAT, BioCentury, "Fierce Diagnostics" ]
+# Feeds: `url` enables real pulls (BRIEF_RSS=real); label-only entries are
+# paywalled publications with no public feed — they stay fixture-only.
+rss_feeds:
+  - { label: GenomeWeb }                  # paywalled, no public feed
+  - { label: "Precision Oncology News" }  # paywalled (GenomeWeb property)
+  - { label: STAT, url: "https://www.statnews.com/feed/" }
+  - { label: BioCentury }                 # paywalled, no public feed
+  - { label: "Fierce Diagnostics", url: "https://www.fiercebiotech.com/rss/xml" }
+  - { label: "Endpoints News", url: "https://endpts.com/feed/" }
 categories: [ Clinical, Commercial, Regulatory, Financial ]
 house_style: |
   Terse IR "First Read" voice. 1-2 sentences per item, factual, no hedging,

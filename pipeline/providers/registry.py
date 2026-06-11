@@ -1,11 +1,20 @@
 """Provider selection. Deterministic, env-driven — never decided by an LLM.
 
-    BRIEF_PROVIDERS  fixture (default) | real      — source + email providers
+    BRIEF_PROVIDERS  fixture (default) | real     — global default for all sources
+    BRIEF_RSS / BRIEF_EDGAR / BRIEF_NEWS / BRIEF_QUOTES / BRIEF_EMAIL
+                     fixture | real               — per-provider override
     BRIEF_CLASSIFIER auto (default) | fixture | rules | anthropic
 
-"auto" uses Anthropic when ANTHROPIC_API_KEY is set and the SDK is installed,
-otherwise the fixture classifier — so the project runs with zero keys and
-upgrades itself when a key appears.
+Real implementations exist for RSS (feed URLs in the universe YAML), EDGAR
+(free; set SEC_EDGAR_USER_AGENT per SEC fair-access policy) and news search
+(Exa; set EXA_API_KEY). Quotes and email transport are still stubs — mix them
+back to fixtures while running real news:
+
+    BRIEF_PROVIDERS=real BRIEF_QUOTES=fixture BRIEF_EMAIL=fixture make run-pipeline
+
+"auto" classification uses Anthropic when ANTHROPIC_API_KEY is set and the SDK
+is installed, otherwise the fixture classifier — so the project always runs
+with zero keys and upgrades itself when keys appear.
 """
 
 from __future__ import annotations
@@ -14,7 +23,9 @@ import importlib.util
 import os
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Callable, TypeVar
 
+from pipeline.contracts import UniverseConfig
 from pipeline.providers.base import (
     ClassifierProvider,
     EdgarProvider,
@@ -32,6 +43,8 @@ from pipeline.providers.fixture import (
     FixtureRSSProvider,
     RulesClassifierProvider,
 )
+
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -65,32 +78,51 @@ def build_classifier(universe_id: str) -> ClassifierProvider:
     raise ValueError(f"Unknown BRIEF_CLASSIFIER={mode!r}")
 
 
-def build_providers(universe_id: str, now: datetime) -> ProviderSet:
-    mode = os.environ.get("BRIEF_PROVIDERS", "fixture").lower()
-    if mode == "fixture":
-        return ProviderSet(
-            rss=FixtureRSSProvider(universe_id, now),
-            edgar=FixtureEdgarProvider(universe_id, now),
-            news=FixtureNewsProvider(universe_id, now),
-            quotes=FixtureQuoteProvider(universe_id, now),
-            classifier=build_classifier(universe_id),
-            email=FixtureEmailProvider(),
-        )
-    if mode == "real":
-        from pipeline.providers.real_stubs import (
-            HttpRSSProvider,
-            MarketDataQuoteProvider,
-            SearchNewsProvider,
-            SecEdgarProvider,
-            SmtpEmailProvider,
-        )
+def _mode(name: str) -> str:
+    default = os.environ.get("BRIEF_PROVIDERS", "fixture").lower()
+    mode = os.environ.get(f"BRIEF_{name}", default).lower()
+    if mode not in ("fixture", "real"):
+        raise ValueError(f"Unknown BRIEF_{name}={mode!r} (expected fixture|real)")
+    return mode
 
-        return ProviderSet(
-            rss=HttpRSSProvider(),
-            edgar=SecEdgarProvider(),
-            news=SearchNewsProvider(),
-            quotes=MarketDataQuoteProvider(),
-            classifier=build_classifier(universe_id),
-            email=SmtpEmailProvider(),
-        )
-    raise ValueError(f"Unknown BRIEF_PROVIDERS={mode!r}")
+
+def _pick(name: str, fixture: Callable[[], T], real: Callable[[], T]) -> T:
+    return fixture() if _mode(name) == "fixture" else real()
+
+
+def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
+    uid = universe.id
+
+    def real_rss() -> RSSProvider:
+        from pipeline.providers.rss import HttpRSSProvider
+
+        return HttpRSSProvider(companies=universe.companies)
+
+    def real_edgar() -> EdgarProvider:
+        from pipeline.providers.edgar import SecEdgarProvider
+
+        return SecEdgarProvider()
+
+    def real_news() -> NewsProvider:
+        from pipeline.providers.exa_news import ExaNewsProvider
+
+        return ExaNewsProvider(companies=universe.companies, watch=universe.private_watch)
+
+    def real_quotes() -> QuoteProvider:
+        from pipeline.providers.real_stubs import MarketDataQuoteProvider
+
+        return MarketDataQuoteProvider()
+
+    def real_email() -> EmailProvider:
+        from pipeline.providers.real_stubs import SmtpEmailProvider
+
+        return SmtpEmailProvider()
+
+    return ProviderSet(
+        rss=_pick("RSS", lambda: FixtureRSSProvider(uid, now), real_rss),
+        edgar=_pick("EDGAR", lambda: FixtureEdgarProvider(uid, now), real_edgar),
+        news=_pick("NEWS", lambda: FixtureNewsProvider(uid, now), real_news),
+        quotes=_pick("QUOTES", lambda: FixtureQuoteProvider(uid, now), real_quotes),
+        classifier=build_classifier(uid),
+        email=_pick("EMAIL", lambda: FixtureEmailProvider(), real_email),
+    )

@@ -31,11 +31,16 @@ def ship(universe_id: str, web_public: Path = Path("web/public")) -> dict:
         }
     brief = DailyBrief.model_validate_json(artifact.read_text(encoding="utf-8"))
     config_path = Path("universes") / f"{universe_id}.yaml"
-    recipients = (
-        load_universe(config_path).delivery.recipients if config_path.exists() else []
-    )
-    providers = build_providers(universe_id, brief.generated_at)
-    receipt = providers.email.send(recipients, email_subject(brief), render_email(brief))
+    if not config_path.exists():
+        return {"ok": False, "detail": f"No universe config at {config_path}."}
+    universe = load_universe(config_path)
+    providers = build_providers(universe, brief.generated_at)
+    try:
+        receipt = providers.email.send(
+            universe.delivery.recipients, email_subject(brief), render_email(brief)
+        )
+    except Exception as exc:
+        return {"ok": False, "detail": f"email send failed: {type(exc).__name__}: {exc}"}
     return {"ok": receipt.accepted, "detail": receipt.detail}
 
 

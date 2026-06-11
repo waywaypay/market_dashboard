@@ -14,7 +14,14 @@ peers:
   - { ticker: MQ,   name: Marqeta }
 private_watch: [ Stripe, Plaid ]
 sector_keywords: [ BNPL, payments, "consumer credit", neobank, "embedded finance", interchange, underwriting ]
-rss_feeds: [ Finextra, "Payments Dive", "American Banker", "TechCrunch Fintech", "Fintech Brainfood" ]
+# Feeds: `url` enables real pulls (BRIEF_RSS=real); label-only entries are
+# paywalled publications with no public feed — they stay fixture-only.
+rss_feeds:
+  - { label: Finextra, url: "https://www.finextra.com/rss/headlines.aspx" }
+  - { label: "Payments Dive", url: "https://www.paymentsdive.com/feeds/news/" }
+  - { label: "American Banker" }          # paywalled, no public feed
+  - { label: "TechCrunch Fintech", url: "https://techcrunch.com/category/fintech/feed/" }
+  - { label: "Fintech Brainfood", url: "https://www.fintechbrainfood.com/feed" }
 categories: [ Product, Partnership, Regulatory, Financial ]
 house_style: |
   Terse IR "First Read" voice. 1-2 sentences per item, factual, no hedging,

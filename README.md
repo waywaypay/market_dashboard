@@ -71,20 +71,50 @@ they can never disagree.
 Every external dependency sits behind a typed interface in
 `pipeline/providers/base.py` with a `Fixture*` reference implementation:
 
-| Interface            | Fixture (default)                  | Real implementation                              |
-| -------------------- | ---------------------------------- | ------------------------------------------------ |
-| `RSSProvider`        | synthetic feed items               | `HttpRSSProvider` (stub + TODO)                  |
-| `EdgarProvider`      | synthetic 8-Ks                     | `SecEdgarProvider` (stub + TODO, submissions API)|
-| `NewsProvider`       | synthetic search results           | `SearchNewsProvider` (stub + TODO)               |
-| `QuoteProvider`      | seeded pre-market snapshot         | `MarketDataQuoteProvider` (stub + TODO)          |
-| `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)          |
-| `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                |
+| Interface            | Fixture (default)                  | Real implementation                                       |
+| -------------------- | ---------------------------------- | --------------------------------------------------------- |
+| `RSSProvider`        | synthetic feed items               | **`HttpRSSProvider` (working)** — feed URLs in the YAML   |
+| `EdgarProvider`      | synthetic 8-Ks                     | **`SecEdgarProvider` (working)** — free SEC submissions API|
+| `NewsProvider`       | synthetic search results           | **`ExaNewsProvider` (working)** — Exa semantic news search|
+| `QuoteProvider`      | seeded pre-market snapshot         | `MarketDataQuoteProvider` (stub + TODO)                   |
+| `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)                   |
+| `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                         |
 
-Selection is env-driven (never LLM-driven): `BRIEF_PROVIDERS=fixture|real`,
-`BRIEF_CLASSIFIER=auto|fixture|rules|anthropic`. `auto` upgrades to the real
-Claude classifier when `ANTHROPIC_API_KEY` is set (`pip install anthropic`),
-otherwise stays on fixtures — same gates, zero keys. Provider failures surface
-as `SourceHealth` entries in the artifact, not crashes.
+Selection is env-driven (never LLM-driven). `BRIEF_PROVIDERS=fixture|real`
+sets the global default; `BRIEF_RSS` / `BRIEF_EDGAR` / `BRIEF_NEWS` /
+`BRIEF_QUOTES` / `BRIEF_EMAIL` override per provider, so you can mix real news
+with fixture quotes while the quote vendor is undecided. Provider failures
+surface as `SourceHealth` entries in the artifact (with the reason, rendered
+in the rail), not crashes.
+
+### Going real
+
+```sh
+export SEC_EDGAR_USER_AGENT="yourapp/1.0 you@example.com"  # SEC fair-access policy
+export EXA_API_KEY="..."                                   # https://exa.ai
+export ANTHROPIC_API_KEY="..."                             # real classification
+
+BRIEF_PROVIDERS=real BRIEF_QUOTES=fixture BRIEF_EMAIL=fixture make run-pipeline
+```
+
+* **EDGAR** — no key needed. Resolves ticker→CIK, pulls recent 8-K/8-K/A
+  filings inside `EDGAR_LOOKBACK_HOURS` (default 36), prefers the EX-99.*
+  press exhibit body, titles filings by item code ("results of operations",
+  "material definitive agreement", …), and throttles well under SEC's 10 req/s.
+* **RSS** — pulls every `rss_feeds` entry with a `url:`; label-only entries
+  (paywalled publications) stay fixture-only. Per-feed failures are tolerated;
+  the pull only fails if *every* feed does.
+* **News (Exa)** — two bounded semantic searches per run (company names incl.
+  private watch; sector keywords) against `POST /search` with
+  `category: news` and a published-date window (`EXA_LOOKBACK_HOURS`, default
+  36; `EXA_NUM_RESULTS` per query, default 10). Undated results are dropped —
+  they can't pass the no-look-ahead gate.
+* **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
+  `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
+
+The cross-source dedupe, ticker inference, look-ahead guard, fuse attribution,
+and all eval gates apply identically to real data. Wire-format correctness is
+pinned by mocked-transport tests in `pipeline/tests/test_real_providers.py`.
 
 ### Universe config — the generalization mechanism
 

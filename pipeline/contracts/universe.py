@@ -20,6 +20,16 @@ class CompanyRef(BaseModel):
     name: str
 
 
+class RSSFeed(BaseModel):
+    """A configured feed. `label` is the display/source name (and what the
+    fixture provider matches on); `url` is required only for real pulls —
+    label-only entries are skipped by the real RSS provider (e.g. paywalled
+    publications with no public feed)."""
+
+    label: str
+    url: str | None = None
+
+
 class Thresholds(BaseModel):
     sigma_multiple: float = 2.0
     rvol: float = 2.0
@@ -41,11 +51,19 @@ class UniverseConfig(BaseModel):
     peers: list[CompanyRef]
     private_watch: list[str] = []
     sector_keywords: list[str] = []
-    rss_feeds: list[str] = []
+    rss_feeds: list[RSSFeed] = []
     categories: list[str] = Field(min_length=1)
     house_style: str
     thresholds: Thresholds = Thresholds()
     delivery: Delivery = Delivery()
+
+    @field_validator("rss_feeds", mode="before")
+    @classmethod
+    def _coerce_feeds(cls, v: object) -> object:
+        # accept plain strings ("GenomeWeb") as label-only feeds
+        if isinstance(v, list):
+            return [{"label": f} if isinstance(f, str) else f for f in v]
+        return v
 
     @field_validator("categories")
     @classmethod
