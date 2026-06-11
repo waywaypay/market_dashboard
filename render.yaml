@@ -1,0 +1,39 @@
+# Render blueprint — deploy with "New → Blueprint" pointing at this repo.
+#
+# One web service runs everything: the build compiles the dashboard and
+# installs the pipeline; the start command serves the built UI, regenerates
+# the artifact at boot and every BRIEF_REFRESH_MINUTES, and exposes the
+# ship/refresh endpoints. No database, no disk: the artifact is recomputed,
+# never persisted.
+#
+# Default config runs on fixtures (zero keys). To go live, set the secret
+# env vars in the Render dashboard and flip BRIEF_PROVIDERS to "real"
+# (quotes/email stay on fixtures until those vendors are implemented).
+
+services:
+  - type: web
+    name: pre-market-read
+    runtime: python
+    plan: free
+    buildCommand: pip install -e . && cd web && npm ci && npm run build
+    startCommand: python -m pipeline.serve
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: NODE_VERSION
+        value: "22.11.0"
+      - key: BRIEF_PROVIDERS
+        value: fixture # flip to "real" once SEC_EDGAR_USER_AGENT / EXA_API_KEY are set
+      - key: BRIEF_QUOTES
+        value: fixture # no real quote vendor yet
+      - key: BRIEF_EMAIL
+        value: fixture # no real email transport yet
+      - key: BRIEF_REFRESH_MINUTES
+        value: "30"
+      - key: SEC_EDGAR_USER_AGENT
+        sync: false # set in dashboard: "yourapp/1.0 you@example.com"
+      - key: EXA_API_KEY
+        sync: false # set in dashboard
+      - key: ANTHROPIC_API_KEY
+        sync: false # set in dashboard (enables the real classifier via BRIEF_CLASSIFIER=auto)

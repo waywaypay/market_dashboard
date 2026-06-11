@@ -33,6 +33,17 @@ export async function loadBrief(universeId?: string): Promise<DailyBrief> {
   return dailyBriefSchema.parse(data);
 }
 
+/** Ask the server to re-run the pipeline (serve.py and the vite dev plugin
+ * both expose this). Failure is non-fatal — the caller refetches the artifact
+ * either way, so a static host degrades to a plain reload. */
+export async function refreshPipeline(): Promise<void> {
+  try {
+    await fetch("/api/refresh", { method: "POST" });
+  } catch {
+    /* static hosting: no pipeline endpoint — refetch alone is the refresh */
+  }
+}
+
 export async function shipFirstRead(
   universeId: string,
 ): Promise<{ ok: boolean; detail: string }> {

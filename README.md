@@ -155,6 +155,35 @@ the product's point of view, rendered as an interaction.
 `python -m pipeline.ship`, which re-renders the email from the artifact and
 sends via the configured `EmailProvider` (fixture writes to `out/emails/`).
 
+## Deploying (Render)
+
+`render.yaml` is a ready Blueprint: in Render choose **New → Blueprint**,
+point it at this repo, and it provisions one web service. Manually, the two
+commands are:
+
+```
+Build:  pip install -e . && cd web && npm ci && npm run build
+Start:  python -m pipeline.serve
+```
+
+`pipeline/serve.py` is the single production process: it serves the built
+dashboard, serves artifacts with `no-store` freshness, exposes
+`POST /api/ship` and `POST /api/refresh` (the ↻ button), health-checks at
+`/healthz`, and re-runs the pipeline at boot plus every
+`BRIEF_REFRESH_MINUTES` (default 30, `0` disables). Scheduled refreshes never
+send email — only the explicit ship action does. No disk or database needed:
+the artifact is recomputed, not persisted, so free-tier spin-down just means
+a fresh brief on wake.
+
+Deploys run on fixtures until you set the secrets in the Render dashboard
+(`SEC_EDGAR_USER_AGENT`, `EXA_API_KEY`, `ANTHROPIC_API_KEY`) and flip
+`BRIEF_PROVIDERS=real`. Note the service is public by default and the ship/
+refresh endpoints are unauthenticated (auth is out of scope by design) —
+keep the URL private or put Render's access controls in front of it.
+
+Local dress rehearsal of exactly what Render runs: `make serve` →
+http://localhost:8000.
+
 ## Repo layout
 
 ```

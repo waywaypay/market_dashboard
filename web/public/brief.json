@@ -1,7 +1,7 @@
 {
   "universe_id": "diagnostics",
-  "generated_at": "2026-06-11T05:47:53.059226Z",
-  "market_open_at": "2026-06-11T09:30:00-04:00",
+  "generated_at": "2026-06-11T16:04:07.220247Z",
+  "market_open_at": "2026-06-12T09:30:00-04:00",
   "tldr": "Natera leads pre-market up ~8% after CMS expands Signatera breast-cancer coverage; Guardant slides on a Shield rate cut and GeneDx pops on an above-guidance preannounce.",
   "counts": {
     "total_items": 16,
@@ -176,7 +176,7 @@
       "title": "Guardant Health Discloses CMS Preliminary Rate Cut for Shield CRC Screening Test",
       "url": "https://www.sec.gov/Archives/edgar/data/0001576280/000157628026000031/gh-8k-shield.htm",
       "source": "EDGAR 8-K",
-      "ts": "2026-06-11T02:49:53.059226Z",
+      "ts": "2026-06-11T13:06:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "GH",
@@ -196,7 +196,7 @@
       "title": "CMS Expands Medicare Coverage for Natera's Signatera MRD Test in Breast Cancer",
       "url": "https://www.genomeweb.com/molecular-diagnostics/natera-signatera-medicare-breast-cancer",
       "source": "GenomeWeb",
-      "ts": "2026-06-11T03:35:53.059226Z",
+      "ts": "2026-06-11T13:52:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "NTRA",
@@ -216,7 +216,7 @@
       "title": "GeneDx Preannounces Q2 Revenue Above Guidance on Exome Volume Strength",
       "url": "https://www.sec.gov/Archives/edgar/data/0001818331/000181833126000022/wgs-8k-prelim.htm",
       "source": "EDGAR 8-K",
-      "ts": "2026-06-11T04:25:53.059226Z",
+      "ts": "2026-06-11T14:42:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "WGS",
@@ -236,7 +236,7 @@
       "title": "Adaptive's clonoSEQ MRD Data Published in NEJM Myeloma Study",
       "url": "https://www.genomeweb.com/mrd/adaptive-clonoseq-nejm-myeloma",
       "source": "GenomeWeb",
-      "ts": "2026-06-11T01:27:53.059226Z",
+      "ts": "2026-06-11T11:44:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "ADPT",
@@ -256,7 +256,7 @@
       "title": "Veracyte Reports Decipher Prostate Inclusion in Updated NCCN Guidelines",
       "url": "https://www.sec.gov/Archives/edgar/data/0001384101/000138410126000045/vcyt-8k-ex991.htm",
       "source": "EDGAR 8-K",
-      "ts": "2026-06-11T02:17:53.059226Z",
+      "ts": "2026-06-11T12:34:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "VCYT",
@@ -276,7 +276,7 @@
       "title": "Myriad Genetics Loses UnitedHealthcare Contract for GeneSight",
       "url": "https://www.fiercebiotech.com/diagnostics/myriad-genesight-unitedhealthcare-contract",
       "source": "Fierce Diagnostics",
-      "ts": "2026-06-11T02:27:53.059226Z",
+      "ts": "2026-06-11T12:44:07.220247Z",
       "is_subject_relevant": false,
       "price_reaction": {
         "ticker": "MYGN",
@@ -296,7 +296,7 @@
       "title": "Caris Life Sciences Receives FDA Breakthrough Device Designation for Blood-Based Assay",
       "url": "https://www.fiercebiotech.com/diagnostics/caris-breakthrough-blood-assay",
       "source": "Fierce Diagnostics",
-      "ts": "2026-06-11T02:37:53.059226Z",
+      "ts": "2026-06-11T12:54:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "CAI",
@@ -316,7 +316,7 @@
       "title": "Tempus, AstraZeneca Expand Partnership to MRD Algorithm Development",
       "url": "https://www.precisiononcologynews.com/tempus-astrazeneca-mrd-expansion",
       "source": "Precision Oncology News",
-      "ts": "2026-06-11T03:13:53.059226Z",
+      "ts": "2026-06-11T13:30:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "TEM",
@@ -336,7 +336,7 @@
       "title": "FDA Finalizes Timeline for Phase Two of LDT Enforcement",
       "url": "https://www.statnews.com/2026/06/fda-ldt-enforcement-phase-two",
       "source": "STAT",
-      "ts": "2026-06-11T04:49:53.059226Z",
+      "ts": "2026-06-11T15:06:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": null,
       "is_driver": false
@@ -354,7 +354,7 @@
         "title": "Veracyte Reports Decipher Prostate Inclusion in Updated NCCN Guidelines",
         "url": "https://www.sec.gov/Archives/edgar/data/0001384101/000138410126000045/vcyt-8k-ex991.htm",
         "source": "EDGAR 8-K",
-        "ts": "2026-06-11T02:17:53.059226Z",
+        "ts": "2026-06-11T12:34:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "VCYT",
@@ -374,7 +374,7 @@
         "title": "Veracyte Announces Date of Q2 2026 Earnings Call",
         "url": "https://www.sec.gov/Archives/edgar/data/0001384101/000138410126000046/vcyt-8k-earningsdate.htm",
         "source": "EDGAR 8-K",
-        "ts": "2026-06-10T23:57:53.059226Z",
+        "ts": "2026-06-11T10:14:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "VCYT",
@@ -396,7 +396,7 @@
         "title": "CMS Expands Medicare Coverage for Natera's Signatera MRD Test in Breast Cancer",
         "url": "https://www.genomeweb.com/molecular-diagnostics/natera-signatera-medicare-breast-cancer",
         "source": "GenomeWeb",
-        "ts": "2026-06-11T03:35:53.059226Z",
+        "ts": "2026-06-11T13:52:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "NTRA",
@@ -418,7 +418,7 @@
         "title": "Guardant Health Discloses CMS Preliminary Rate Cut for Shield CRC Screening Test",
         "url": "https://www.sec.gov/Archives/edgar/data/0001576280/000157628026000031/gh-8k-shield.htm",
         "source": "EDGAR 8-K",
-        "ts": "2026-06-11T02:49:53.059226Z",
+        "ts": "2026-06-11T13:06:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "GH",
@@ -438,7 +438,7 @@
         "title": "Guardant Reveal ctDNA Surveillance Data Published in JCO",
         "url": "https://www.onclive.com/guardant-reveal-jco-surveillance",
         "source": "News Search",
-        "ts": "2026-06-11T03:27:53.059226Z",
+        "ts": "2026-06-11T13:44:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "GH",
@@ -460,7 +460,7 @@
         "title": "Adaptive's clonoSEQ MRD Data Published in NEJM Myeloma Study",
         "url": "https://www.genomeweb.com/mrd/adaptive-clonoseq-nejm-myeloma",
         "source": "GenomeWeb",
-        "ts": "2026-06-11T01:27:53.059226Z",
+        "ts": "2026-06-11T11:44:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "ADPT",
@@ -482,7 +482,7 @@
         "title": "Tempus, AstraZeneca Expand Partnership to MRD Algorithm Development",
         "url": "https://www.precisiononcologynews.com/tempus-astrazeneca-mrd-expansion",
         "source": "Precision Oncology News",
-        "ts": "2026-06-11T03:13:53.059226Z",
+        "ts": "2026-06-11T13:30:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "TEM",
@@ -504,7 +504,7 @@
         "title": "Caris Life Sciences Receives FDA Breakthrough Device Designation for Blood-Based Assay",
         "url": "https://www.fiercebiotech.com/diagnostics/caris-breakthrough-blood-assay",
         "source": "Fierce Diagnostics",
-        "ts": "2026-06-11T02:37:53.059226Z",
+        "ts": "2026-06-11T12:54:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "CAI",
@@ -526,7 +526,7 @@
         "title": "GeneDx Preannounces Q2 Revenue Above Guidance on Exome Volume Strength",
         "url": "https://www.sec.gov/Archives/edgar/data/0001818331/000181833126000022/wgs-8k-prelim.htm",
         "source": "EDGAR 8-K",
-        "ts": "2026-06-11T04:25:53.059226Z",
+        "ts": "2026-06-11T14:42:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "WGS",
@@ -548,7 +548,7 @@
         "title": "Biodesix Publishes Validation Study for Nodify Lung Nodule Strategy",
         "url": "https://www.genomeweb.com/lung/biodesix-nodify-validation-study",
         "source": "GenomeWeb",
-        "ts": "2026-06-11T01:12:53.059226Z",
+        "ts": "2026-06-11T11:29:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "BDSX",
@@ -570,7 +570,7 @@
         "title": "Castle Biosciences DecisionDx-Melanoma Data Selected for ASCO Oral Session",
         "url": "https://www.genomeweb.com/cancer/castle-decisiondx-asco-oral",
         "source": "GenomeWeb",
-        "ts": "2026-06-11T01:47:53.059226Z",
+        "ts": "2026-06-11T12:04:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "CSTL",
@@ -592,7 +592,7 @@
         "title": "Myriad Genetics Loses UnitedHealthcare Contract for GeneSight",
         "url": "https://www.fiercebiotech.com/diagnostics/myriad-genesight-unitedhealthcare-contract",
         "source": "Fierce Diagnostics",
-        "ts": "2026-06-11T02:27:53.059226Z",
+        "ts": "2026-06-11T12:44:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "MYGN",
@@ -614,7 +614,7 @@
         "title": "BillionToOne Expands UNITY Fetal Risk Screen Into Two New State Medicaid Programs",
         "url": "https://www.prnewswire.com/billiontoone-unity-medicaid-expansion",
         "source": "News Search",
-        "ts": "2026-06-11T05:00:53.059226Z",
+        "ts": "2026-06-11T15:17:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "BLLN",
@@ -636,7 +636,7 @@
         "title": "ArteraAI Raises $90M Series C to Expand Digital Pathology Platform",
         "url": "https://www.fiercehealthcare.com/health-tech/arteraai-series-c-90m",
         "source": "News Search",
-        "ts": "2026-06-11T04:12:53.059226Z",
+        "ts": "2026-06-11T14:29:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": null,
         "is_driver": false
@@ -654,7 +654,7 @@
       "title": "FDA Finalizes Timeline for Phase Two of LDT Enforcement",
       "url": "https://www.statnews.com/2026/06/fda-ldt-enforcement-phase-two",
       "source": "STAT",
-      "ts": "2026-06-11T04:49:53.059226Z",
+      "ts": "2026-06-11T15:06:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": null,
       "is_driver": false
@@ -669,7 +669,7 @@
       "title": "Reimbursement Pressure Builds Across Genomic Testing as Payers Tighten Prior Auth",
       "url": "https://www.statnews.com/2026/06/genomic-testing-reimbursement-pressure",
       "source": "STAT",
-      "ts": "2026-06-11T00:27:53.059226Z",
+      "ts": "2026-06-11T10:44:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": null,
       "is_driver": false
@@ -679,25 +679,25 @@
     {
       "provider": "rss",
       "status": "ok",
-      "last_ts": "2026-06-11T04:49:53.059226Z",
+      "last_ts": "2026-06-11T15:06:07.220247Z",
       "detail": null
     },
     {
       "provider": "edgar",
       "status": "stale",
-      "last_ts": "2026-06-11T04:25:53.059226Z",
+      "last_ts": "2026-06-11T14:42:07.220247Z",
       "detail": "newest EDGAR pull is 82 min old — feed may be stale"
     },
     {
       "provider": "news",
       "status": "ok",
-      "last_ts": "2026-06-11T05:00:53.059226Z",
+      "last_ts": "2026-06-11T15:17:07.220247Z",
       "detail": null
     },
     {
       "provider": "quotes",
       "status": "ok",
-      "last_ts": "2026-06-11T05:47:53.059226Z",
+      "last_ts": "2026-06-11T16:04:07.220247Z",
       "detail": null
     }
   ],

@@ -16,7 +16,7 @@ import { SectorHeadlines } from "./components/SectorHeadlines";
 import { RightRail } from "./components/RightRail";
 import { EmailModal } from "./components/EmailModal";
 import type { DailyBrief, Item, UniverseEntry } from "./lib/contracts";
-import { loadBrief, loadUniverses } from "./lib/loadBrief";
+import { loadBrief, loadUniverses, refreshPipeline } from "./lib/loadBrief";
 
 type LoadState =
   | { phase: "loading" }
@@ -59,6 +59,16 @@ export default function App() {
     loadUniverses().then(setUniverses);
     void fetchBrief();
   }, [fetchBrief]);
+
+  // ↻ = re-run the pipeline (where a server exists), then re-read the artifact
+  const hardRefresh = useCallback(
+    async (universeId: string) => {
+      setRefreshing(true);
+      await refreshPipeline();
+      await fetchBrief(universeId);
+    },
+    [fetchBrief],
+  );
 
   const brief = state.phase === "ready" ? state.brief : null;
 
@@ -112,7 +122,7 @@ export default function App() {
         brief={brief}
         universes={universes}
         onSelectUniverse={(id) => void fetchBrief(id)}
-        onRefresh={() => void fetchBrief(brief.universe_id)}
+        onRefresh={() => void hardRefresh(brief.universe_id)}
         refreshing={refreshing}
       />
       <TheRead brief={brief} />

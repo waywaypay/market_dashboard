@@ -17,7 +17,7 @@ PY      := .venv/bin/python
 PIP     := .venv/bin/pip
 PYTEST  := .venv/bin/pytest
 
-.PHONY: setup dev run-pipeline web test eval build clean
+.PHONY: setup dev run-pipeline web serve test eval build clean
 
 setup:
 	python3 -m venv .venv
@@ -33,6 +33,11 @@ dev: run-pipeline
 
 web:
 	cd web && npm run dev
+
+# Production-style serving (what Render runs): built UI + artifact refreshes
+# + ship/refresh endpoints from a single process on $PORT (default 8000).
+serve: build
+	$(PY) -m pipeline.serve
 
 test:
 	$(PYTEST) pipeline/tests

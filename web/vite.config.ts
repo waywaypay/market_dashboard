@@ -24,6 +24,30 @@ function shipEmailPlugin(): Plugin {
   return {
     name: "ship-email",
     configureServer(server) {
+      // dev parity with pipeline/serve.py: re-run the pipeline on demand
+      server.middlewares.use("/api/refresh", (req, res) => {
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ ok: false, detail: "POST only" }));
+          return;
+        }
+        const proc = spawn(python, ["-m", "pipeline.orchestrator", "--no-email"], {
+          cwd: repoRoot,
+        });
+        let err = "";
+        proc.stderr.on("data", (d) => (err += d));
+        proc.on("close", (code) => {
+          res.setHeader("Content-Type", "application/json");
+          res.statusCode = code === 0 ? 200 : 500;
+          res.end(
+            JSON.stringify(
+              code === 0
+                ? { ok: true, detail: "pipeline re-run complete" }
+                : { ok: false, detail: err.trim() || `pipeline exited ${code}` },
+            ),
+          );
+        });
+      });
       server.middlewares.use("/api/ship", (req, res) => {
         if (req.method !== "POST") {
           res.statusCode = 405;

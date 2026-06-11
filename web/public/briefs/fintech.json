@@ -1,7 +1,7 @@
 {
   "universe_id": "fintech",
-  "generated_at": "2026-06-11T05:47:53.059226Z",
-  "market_open_at": "2026-06-11T09:30:00-04:00",
+  "generated_at": "2026-06-11T16:04:07.220247Z",
+  "market_open_at": "2026-06-12T09:30:00-04:00",
   "tldr": "Affirm gaps up ~11% on an exclusive Walmart OnePay BNPL deal; Upstart pops on an above-guidance preannounce while Shift4 slips on a $1.5B European acquisition.",
   "counts": {
     "total_items": 13,
@@ -163,7 +163,7 @@
       "title": "Affirm Signs Exclusive BNPL Agreement With Walmart OnePay",
       "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000051/afrm-8k-walmart.htm",
       "source": "EDGAR 8-K",
-      "ts": "2026-06-11T03:17:53.059226Z",
+      "ts": "2026-06-11T13:34:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "AFRM",
@@ -183,7 +183,7 @@
       "title": "Upstart Preannounces Q2 Revenue Above Guidance, Reinstates Full-Year Outlook",
       "url": "https://www.sec.gov/Archives/edgar/data/0001647639/000164763926000033/upst-8k-prelim.htm",
       "source": "EDGAR 8-K",
-      "ts": "2026-06-11T04:19:53.059226Z",
+      "ts": "2026-06-11T14:36:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "UPST",
@@ -203,7 +203,7 @@
       "title": "Shift4 to Acquire European Payments Processor in $1.5B Deal",
       "url": "https://www.reuters.com/markets/shift4-european-acquisition",
       "source": "News Search",
-      "ts": "2026-06-11T03:07:53.059226Z",
+      "ts": "2026-06-11T13:24:07.220247Z",
       "is_subject_relevant": false,
       "price_reaction": {
         "ticker": "FOUR",
@@ -223,7 +223,7 @@
       "title": "Nubank Receives Full Banking License in Mexico",
       "url": "https://www.americanbanker.com/news/nubank-mexico-banking-license",
       "source": "American Banker",
-      "ts": "2026-06-11T02:42:53.059226Z",
+      "ts": "2026-06-11T12:59:07.220247Z",
       "is_subject_relevant": false,
       "price_reaction": {
         "ticker": "NU",
@@ -243,7 +243,7 @@
       "title": "PayPal Strikes Deal to Add Branded Checkout to Amazon-Powered Stores",
       "url": "https://www.paymentsdive.com/news/paypal-amazon-buy-button-deal",
       "source": "Payments Dive",
-      "ts": "2026-06-11T02:52:53.059226Z",
+      "ts": "2026-06-11T13:09:07.220247Z",
       "is_subject_relevant": false,
       "price_reaction": {
         "ticker": "PYPL",
@@ -263,7 +263,7 @@
       "title": "Block Expands Cash App Borrow Nationally After FDIC Clearance",
       "url": "https://www.finextra.com/newsarticle/block-cash-app-borrow-national-rollout",
       "source": "Finextra",
-      "ts": "2026-06-11T03:33:53.059226Z",
+      "ts": "2026-06-11T13:50:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": {
         "ticker": "XYZ",
@@ -283,7 +283,7 @@
       "title": "CFPB Interpretive Rule Treating BNPL as Credit Cards Vacated by Court",
       "url": "https://www.americanbanker.com/news/cfpb-bnpl-credit-card-rule-vacated",
       "source": "American Banker",
-      "ts": "2026-06-11T03:47:53.059226Z",
+      "ts": "2026-06-11T14:04:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": null,
       "is_driver": false
@@ -298,7 +298,7 @@
       "title": "Marqeta Renews Core Program Agreement With Block Through 2030",
       "url": "https://www.finextra.com/newsarticle/marqeta-renews-block-program-agreement",
       "source": "Finextra",
-      "ts": "2026-06-11T04:44:53.059226Z",
+      "ts": "2026-06-11T15:01:07.220247Z",
       "is_subject_relevant": false,
       "price_reaction": {
         "ticker": "MQ",
@@ -321,7 +321,7 @@
         "title": "Affirm Signs Exclusive BNPL Agreement With Walmart OnePay",
         "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000051/afrm-8k-walmart.htm",
         "source": "EDGAR 8-K",
-        "ts": "2026-06-11T03:17:53.059226Z",
+        "ts": "2026-06-11T13:34:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "AFRM",
@@ -341,7 +341,7 @@
         "title": "Affirm Prices $750M Asset-Backed Securitization at Tighter Spreads",
         "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000052/afrm-8k-abs.htm",
         "source": "EDGAR 8-K",
-        "ts": "2026-06-11T04:25:53.059226Z",
+        "ts": "2026-06-11T14:42:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "AFRM",
@@ -363,7 +363,7 @@
         "title": "Upstart Preannounces Q2 Revenue Above Guidance, Reinstates Full-Year Outlook",
         "url": "https://www.sec.gov/Archives/edgar/data/0001647639/000164763926000033/upst-8k-prelim.htm",
         "source": "EDGAR 8-K",
-        "ts": "2026-06-11T04:19:53.059226Z",
+        "ts": "2026-06-11T14:36:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "UPST",
@@ -385,7 +385,7 @@
         "title": "SoFi Tops 11 Million Members as Direct Deposit Adoption Accelerates",
         "url": "https://www.paymentsdive.com/news/sofi-charter-direct-deposit-milestone",
         "source": "Payments Dive",
-        "ts": "2026-06-11T03:02:53.059226Z",
+        "ts": "2026-06-11T13:19:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "SOFI",
@@ -407,7 +407,7 @@
         "title": "Block Expands Cash App Borrow Nationally After FDIC Clearance",
         "url": "https://www.finextra.com/newsarticle/block-cash-app-borrow-national-rollout",
         "source": "Finextra",
-        "ts": "2026-06-11T03:33:53.059226Z",
+        "ts": "2026-06-11T13:50:07.220247Z",
         "is_subject_relevant": true,
         "price_reaction": {
           "ticker": "XYZ",
@@ -429,7 +429,7 @@
         "title": "PayPal Strikes Deal to Add Branded Checkout to Amazon-Powered Stores",
         "url": "https://www.paymentsdive.com/news/paypal-amazon-buy-button-deal",
         "source": "Payments Dive",
-        "ts": "2026-06-11T02:52:53.059226Z",
+        "ts": "2026-06-11T13:09:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "PYPL",
@@ -451,7 +451,7 @@
         "title": "Robinhood Launches Tokenized U.S. Equities for EU Customers",
         "url": "https://www.bloomberg.com/news/robinhood-tokenized-equities-eu",
         "source": "News Search",
-        "ts": "2026-06-11T04:53:53.059226Z",
+        "ts": "2026-06-11T15:10:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "HOOD",
@@ -473,7 +473,7 @@
         "title": "Nubank Receives Full Banking License in Mexico",
         "url": "https://www.americanbanker.com/news/nubank-mexico-banking-license",
         "source": "American Banker",
-        "ts": "2026-06-11T02:42:53.059226Z",
+        "ts": "2026-06-11T12:59:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "NU",
@@ -495,7 +495,7 @@
         "title": "BILL Holdings Reports Record Spend & Expense Card Volume",
         "url": "https://www.paymentsdive.com/news/bill-spend-expense-card-volume",
         "source": "Payments Dive",
-        "ts": "2026-06-11T02:17:53.059226Z",
+        "ts": "2026-06-11T12:34:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "BILL",
@@ -517,7 +517,7 @@
         "title": "Shift4 to Acquire European Payments Processor in $1.5B Deal",
         "url": "https://www.reuters.com/markets/shift4-european-acquisition",
         "source": "News Search",
-        "ts": "2026-06-11T03:07:53.059226Z",
+        "ts": "2026-06-11T13:24:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "FOUR",
@@ -539,7 +539,7 @@
         "title": "Marqeta Renews Core Program Agreement With Block Through 2030",
         "url": "https://www.finextra.com/newsarticle/marqeta-renews-block-program-agreement",
         "source": "Finextra",
-        "ts": "2026-06-11T04:44:53.059226Z",
+        "ts": "2026-06-11T15:01:07.220247Z",
         "is_subject_relevant": false,
         "price_reaction": {
           "ticker": "MQ",
@@ -562,7 +562,7 @@
       "title": "CFPB Interpretive Rule Treating BNPL as Credit Cards Vacated by Court",
       "url": "https://www.americanbanker.com/news/cfpb-bnpl-credit-card-rule-vacated",
       "source": "American Banker",
-      "ts": "2026-06-11T03:47:53.059226Z",
+      "ts": "2026-06-11T14:04:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": null,
       "is_driver": false
@@ -577,7 +577,7 @@
       "title": "Subprime Consumer Delinquencies Tick Up, Pressuring Lender Funding Costs",
       "url": "https://www.americanbanker.com/news/consumer-credit-delinquency-subprime-watch",
       "source": "American Banker",
-      "ts": "2026-06-11T01:42:53.059226Z",
+      "ts": "2026-06-11T11:59:07.220247Z",
       "is_subject_relevant": true,
       "price_reaction": null,
       "is_driver": false
@@ -587,25 +587,25 @@
     {
       "provider": "rss",
       "status": "ok",
-      "last_ts": "2026-06-11T04:44:53.059226Z",
+      "last_ts": "2026-06-11T15:01:07.220247Z",
       "detail": null
     },
     {
       "provider": "edgar",
       "status": "stale",
-      "last_ts": "2026-06-11T04:25:53.059226Z",
+      "last_ts": "2026-06-11T14:42:07.220247Z",
       "detail": "newest EDGAR pull is 82 min old — feed may be stale"
     },
     {
       "provider": "news",
       "status": "ok",
-      "last_ts": "2026-06-11T04:53:53.059226Z",
+      "last_ts": "2026-06-11T15:10:07.220247Z",
       "detail": null
     },
     {
       "provider": "quotes",
       "status": "ok",
-      "last_ts": "2026-06-11T05:47:53.059226Z",
+      "last_ts": "2026-06-11T16:04:07.220247Z",
       "detail": null
     }
   ],
