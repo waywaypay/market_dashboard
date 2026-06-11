@@ -170,14 +170,15 @@ Start Command:  python -m pipeline.serve
 ```
 
 The repo is robust to Render's auto-detection either way: `.python-version`
-pins Python 3.11, `requirements.txt` covers the pip default path, and
-`[tool.poetry].packages` makes the bare `poetry install` default succeed.
-A default build never compiles the dashboard, so the server self-heals: when
-`web/dist` is missing at boot it runs `npm ci && npm run build` itself,
-serving a self-refreshing "compiling…" page (~a minute) until the cockpit is
-live (`BRIEF_AUTO_BUILD=0` disables). Setting the build command above is
-still the better steady state — it moves that minute from every cold start
-into the deploy.
+pins Python 3.11, `requirements.txt` covers the pip default path,
+`[tool.poetry].packages` makes the bare `poetry install` default succeed —
+and **`web/dist` ships prebuilt in the repo**, so the dashboard loads
+immediately on any deploy path with no build step and no cold-start compile.
+Two layers of freshness sit behind that: a deploy build command (when set)
+rebuilds `dist` from source, and if `dist` is ever missing the server
+self-heals by running `npm ci && npm run build` itself behind a
+self-refreshing status page (`BRIEF_AUTO_BUILD=0` disables). If you change
+`web/src`, run `make build` and commit the refreshed `dist`.
 
 `pipeline/serve.py` is the single production process: it serves the built
 dashboard, serves artifacts with `no-store` freshness, exposes
