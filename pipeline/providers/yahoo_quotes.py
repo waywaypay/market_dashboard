@@ -72,6 +72,7 @@ class YahooQuoteProvider(QuoteProvider):
         throttle_s: float = 0.5,
         max_attempts: int = 3,
         backoff_s: float = 1.5,
+        deadline_s: float | None = None,
         transport: httpx.BaseTransport | None = None,
     ):
         self.companies = companies or {}  # ticker -> display name
@@ -83,9 +84,19 @@ class YahooQuoteProvider(QuoteProvider):
         self.throttle_s = throttle_s
         self.max_attempts = max_attempts
         self.backoff_s = backoff_s
+        # Hard budget for one snapshot. Without it, a blackholing or hard-
+        # throttling vendor times out per request x retries x tickers and a
+        # refresh can run for many minutes.
+        self.deadline_s = float(
+            deadline_s
+            if deadline_s is not None
+            else os.environ.get("QUOTES_DEADLINE_S", "120")
+        )
+        self._deadline = float("inf")
         self._client = make_client(
             transport=transport,
             headers={"User-Agent": BROWSER_UA, "Accept": "application/json"},
+            timeout=8.0,  # Yahoo answers fast or not at all
         )
 
     # -- public interface ---------------------------------------------------
@@ -93,6 +104,7 @@ class YahooQuoteProvider(QuoteProvider):
     def snapshot(self, tickers: list[str]) -> list[Quote]:
         if not tickers:
             return []
+        self._deadline = time.monotonic() + self.deadline_s
         try:
             return self._snapshot_batched(tickers)
         except Exception as exc:
@@ -192,7 +204,14 @@ class YahooQuoteProvider(QuoteProvider):
     def _snapshot_charted(self, tickers: list[str]) -> list[Quote]:
         quotes: list[Quote] = []
         last_error: Exception | None = None
-        for ticker in tickers:
+        for n, ticker in enumerate(tickers):
+            if n and time.monotonic() > self._deadline:
+                print(
+                    f"[quotes] time budget exhausted — pulled {len(quotes)} of "
+                    f"{len(tickers)} tickers",
+                    file=sys.stderr,
+                )
+                break
             try:
                 quotes.append(self._quote_for(ticker))
             except Exception as exc:
@@ -248,6 +267,9 @@ class YahooQuoteProvider(QuoteProvider):
 
     def _history_best_effort(self, ticker: str) -> tuple[list[float], list[int]]:
         """sigma/avg inputs must never take the price down with them."""
+        cached = _HISTORY_CACHE.get(ticker)
+        if cached is None and time.monotonic() > self._deadline:
+            return [], []  # out of budget — DEFAULT_SIGMA beats a late brief
         try:
             return self._daily_history(ticker)
         except Exception as exc:
@@ -294,6 +316,8 @@ class YahooQuoteProvider(QuoteProvider):
         wait = self.backoff_s
         for attempt in range(self.max_attempts):
             if attempt:
+                if time.monotonic() + wait > self._deadline:
+                    break  # retrying would blow the budget — surface what we have
                 time.sleep(wait)
                 wait *= 2
             for host in CHART_HOSTS:
