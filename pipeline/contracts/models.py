@@ -46,7 +46,7 @@ class Quote(BaseModel):
 
 
 class Classification(BaseModel):
-    """Per-item output of the process (Claude) stage."""
+    """Per-item output of the process (LLM) stage."""
 
     item_id: str
     ticker: Optional[str] = None  # None => sector-wide story
@@ -128,4 +128,4 @@ class DailyBrief(BaseModel):
     subject_name: str
     categories: list[str]  # ordered; UI maps index -> category color
     display_tz: str  # IANA tz for rendering timestamps (delivery.tz)
-    classifier_engine: str  # "fixture" | "rules" | "anthropic" (provenance)
+    classifier_engine: str  # "fixture" | "rules" | "venice" (provenance)

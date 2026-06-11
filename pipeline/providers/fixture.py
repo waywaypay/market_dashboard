@@ -109,8 +109,8 @@ class FixtureClassifierProvider(ClassifierProvider):
     """Canned classifications keyed by item id; rule-based for unseen items.
 
     This is the reference implementation of the process stage's contract —
-    the eval gate compares its output (and, when a key is present, real
-    Claude's) against the gold labels in pipeline/evals/gold/.
+    the eval gate compares its output (and, when a key is present, the real
+    Venice classifier's) against the gold labels in pipeline/evals/gold/.
     """
 
     def __init__(self, universe_id: str):
@@ -129,7 +129,7 @@ class FixtureClassifierProvider(ClassifierProvider):
             else:
                 out.append(rules.classify_item(item, universe))
         # The canned tldr describes the fixture stories. If nothing matched
-        # (e.g. real sources with no ANTHROPIC_API_KEY), it would headline
+        # (e.g. real sources with no VENICE_API_KEY), it would headline
         # synthetic events over real items — compose deterministically instead.
         tldr = data["tldr"] if canned_hits else compose_tldr_fallback(out, universe)
         return ClassifierResult(tldr=tldr, classifications=out, engine="fixture")

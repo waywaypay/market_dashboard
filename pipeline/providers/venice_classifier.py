@@ -1,18 +1,20 @@
-"""Real process-stage provider: ONE batched Anthropic API call per run.
+"""Real process-stage provider: ONE batched Venice AI API call per run.
 
 Contract (see ClassifierProvider): strict JSON only, validated against
 `ClassificationBatch`; on parse/validation failure retry once, then fall back
 to rule-based tagging. The run never crashes because of the LLM, and the LLM
 never decides control flow — it only fills in per-item fields + the tldr.
 
-Requires ANTHROPIC_API_KEY (the SDK ships with the project's dependencies).
-The import stays lazy/defensive so a broken SDK install can never take the
-fixture path down with it.
+Requires VENICE_API_KEY. Venice exposes an OpenAI-compatible chat-completions
+endpoint, so the call goes through httpx (already a core dependency) — no
+vendor SDK to install or break.
 """
 
 from __future__ import annotations
 
 import os
+
+import httpx
 
 from pipeline.contracts import RawItem, UniverseConfig
 from pipeline.contracts.models import Classification, ClassificationBatch
@@ -20,7 +22,8 @@ from pipeline.providers import rules
 from pipeline.providers.base import ClassifierProvider, ClassifierResult
 from pipeline.providers.fixture import compose_tldr_fallback
 
-DEFAULT_MODEL = "claude-opus-4-8"
+DEFAULT_MODEL = "llama-3.3-70b"
+BASE_URL = "https://api.venice.ai/api/v1"
 
 _SYSTEM_TEMPLATE = """You are the classification engine inside a pre-market competitive-intelligence \
 pipeline for IR and equity professionals covering {label}. The subject company is \
@@ -54,23 +57,23 @@ def _render_items(items: list[RawItem]) -> str:
     return "\n\n".join(blocks)
 
 
-class AnthropicClassifierProvider(ClassifierProvider):
+class VeniceClassifierProvider(ClassifierProvider):
     def __init__(self, model: str | None = None, max_retries: int = 1):
-        self.model = model or os.environ.get("BRIEF_ANTHROPIC_MODEL", DEFAULT_MODEL)
+        self.model = model or os.environ.get("BRIEF_VENICE_MODEL", DEFAULT_MODEL)
         self.max_retries = max_retries
-        try:
-            import anthropic  # lazy: optional dependency
-        except ImportError as exc:  # pragma: no cover - env without the SDK
-            raise RuntimeError(
-                "BRIEF_CLASSIFIER=anthropic requires the SDK: pip install anthropic"
-            ) from exc
-        # Resolves ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN from the environment.
-        self._client = anthropic.Anthropic()
+        api_key = os.environ.get("VENICE_API_KEY")
+        if not api_key:
+            raise RuntimeError("BRIEF_CLASSIFIER=venice requires VENICE_API_KEY")
+        self._client = httpx.Client(
+            base_url=os.environ.get("VENICE_BASE_URL", BASE_URL),
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=120.0,
+        )
 
     def classify(self, items: list[RawItem], universe: UniverseConfig) -> ClassifierResult:
         if not items:
             return ClassifierResult(
-                tldr=compose_tldr_fallback([], universe), classifications=[], engine="anthropic"
+                tldr=compose_tldr_fallback([], universe), classifications=[], engine="venice"
             )
         system = _SYSTEM_TEMPLATE.format(
             label=universe.label,
@@ -97,24 +100,38 @@ class AnthropicClassifierProvider(ClassifierProvider):
         return ClassifierResult(
             tldr=compose_tldr_fallback(fallback, universe),
             classifications=fallback,
-            engine=f"rules (anthropic failed: {type(last_error).__name__})",
+            engine=f"rules (venice failed: {type(last_error).__name__})",
         )
 
     def _call(self, system: str, user: str) -> ClassificationBatch:
-        # Structured outputs via messages.parse(): the response is constrained
-        # to the ClassificationBatch JSON schema and validated by the SDK.
-        response = self._client.messages.parse(
-            model=self.model,
-            max_tokens=16000,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-            output_format=ClassificationBatch,
+        # Structured outputs via response_format=json_schema: the response is
+        # constrained to the ClassificationBatch JSON schema server-side, then
+        # re-validated locally by Pydantic.
+        response = self._client.post(
+            "/chat/completions",
+            json={
+                "model": self.model,
+                "max_tokens": 16000,
+                "temperature": 0,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "classification_batch",
+                        "strict": True,
+                        "schema": ClassificationBatch.model_json_schema(),
+                    },
+                },
+                # Don't let Venice's default system prompt dilute ours.
+                "venice_parameters": {"include_venice_system_prompt": False},
+            },
         )
-        parsed = response.parsed_output
-        if parsed is None:  # defensive: parse mode should always populate this
-            text = next((b.text for b in response.content if b.type == "text"), "")
-            parsed = ClassificationBatch.model_validate_json(_strip_fences(text))
-        return parsed
+        response.raise_for_status()
+        text = response.json()["choices"][0]["message"]["content"]
+        return ClassificationBatch.model_validate_json(_strip_fences(text))
 
     def _reconcile(
         self, batch: ClassificationBatch, items: list[RawItem], universe: UniverseConfig
@@ -139,7 +156,7 @@ class AnthropicClassifierProvider(ClassifierProvider):
         ]
         if not batch.tldr.strip():
             raise ValueError("classifier returned an empty tldr")
-        return ClassifierResult(tldr=batch.tldr.strip(), classifications=out, engine="anthropic")
+        return ClassifierResult(tldr=batch.tldr.strip(), classifications=out, engine="venice")
 
 
 def _strip_fences(text: str) -> str:

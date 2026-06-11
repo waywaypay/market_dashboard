@@ -11,7 +11,7 @@
 #   45 6 * * 1-5  cd /path/to/repo && make run-pipeline
 #
 # Env knobs (see pipeline/providers/registry.py):
-#   BRIEF_PROVIDERS=fixture|real      BRIEF_CLASSIFIER=auto|fixture|rules|anthropic
+#   BRIEF_PROVIDERS=fixture|real      BRIEF_CLASSIFIER=auto|fixture|rules|venice
 
 PY      := .venv/bin/python
 PIP     := .venv/bin/pip

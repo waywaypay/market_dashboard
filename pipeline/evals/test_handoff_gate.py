@@ -8,9 +8,9 @@ and asserts:
      within tolerance;
   3. summaries are non-empty and terse (house-style sanity).
 
-Tolerances differ by engine: the fixture/Claude classifier is held tight; the
+Tolerances differ by engine: the fixture/Venice classifier is held tight; the
 rule-based fallback is held to a looser floor (it only has to be safe, not
-sharp). When ANTHROPIC_API_KEY is set, the "active" classifier IS Claude, so
+sharp). When VENICE_API_KEY is set, the "active" classifier IS Venice, so
 this gate exercises the real handoff.
 """
 

@@ -116,7 +116,7 @@ def score_against_gold(
 
 
 def classifiers_under_test(universe_id: str) -> list[ClassifierProvider]:
-    """The active classifier (fixture in CI, Claude when a key is present) plus
+    """The active classifier (fixture in CI, Venice when a key is present) plus
     the rule-based floor — both must clear the gate (at different tolerances)."""
     from pipeline.providers.registry import build_classifier
 
