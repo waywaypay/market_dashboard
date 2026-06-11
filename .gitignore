@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Node
+web/node_modules/
+web/dist/
+
+# Pipeline output (emails written by the FixtureEmailProvider)
+out/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# TypeScript incremental build state
+*.tsbuildinfo

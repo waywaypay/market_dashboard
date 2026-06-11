@@ -1,0 +1,18 @@
+{
+  "_comment": "Gold labels for the classify/summarize handoff gate. Each entry pins the expected category, a materiality band (low/high inclusive), and is_subject_relevant for a RawItem. The gate asserts the classifier's output validates against the contract and matches these within tolerance. Materiality is a band, not an exact int, because summarization voice is allowed to vary; category and subject-relevance are exact.",
+  "universe": "diagnostics",
+  "labels": {
+    "dx-001": { "category": "Regulatory", "materiality_min": 4, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-003": { "category": "Clinical",   "materiality_min": 4, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-004": { "category": "Regulatory", "materiality_min": 4, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-005": { "category": "Financial",  "materiality_min": 4, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-006": { "category": "Commercial", "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-007": { "category": "Commercial", "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": false },
+    "dx-008": { "category": "Clinical",   "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-009": { "category": "Regulatory", "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-011": { "category": "Financial",  "materiality_min": 1, "materiality_max": 1, "is_subject_relevant": false },
+    "dx-014": { "category": "Regulatory", "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": true },
+    "dx-015": { "category": "Regulatory", "materiality_min": 2, "materiality_max": 4, "is_subject_relevant": true },
+    "dx-019": { "category": "Financial",  "materiality_min": 1, "materiality_max": 3, "is_subject_relevant": true }
+  }
+}

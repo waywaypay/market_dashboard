@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-surface text-ink font-body antialiased;
+  }
+
+  /* Numerics are always mono — the cockpit reads like a terminal. */
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* Visible keyboard focus everywhere (quality floor). */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-1 ring-offset-surface;
+  }
+}
+
+@layer utilities {
+  /* Respect reduced-motion: kill the open countdown pulse + transitions. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  .hairline {
+    @apply border-hairline;
+  }
+}

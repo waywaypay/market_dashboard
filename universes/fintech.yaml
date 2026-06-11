@@ -1,0 +1,28 @@
+id: fintech
+label: "Consumer Fintech & Payments"
+subject: { ticker: AFRM, name: Affirm }
+peers:
+  - { ticker: UPST, name: Upstart }
+  - { ticker: SOFI, name: SoFi }
+  - { ticker: XYZ,  name: Block }
+  - { ticker: PYPL, name: PayPal }
+  - { ticker: HOOD, name: Robinhood }
+  - { ticker: NU,   name: Nubank }
+  - { ticker: TOST, name: Toast }
+  - { ticker: BILL, name: "BILL Holdings" }
+  - { ticker: FOUR, name: Shift4 }
+  - { ticker: MQ,   name: Marqeta }
+private_watch: [ Stripe, Plaid ]
+sector_keywords: [ BNPL, payments, "consumer credit", neobank, "embedded finance", interchange, underwriting ]
+rss_feeds: [ Finextra, "Payments Dive", "American Banker", "TechCrunch Fintech", "Fintech Brainfood" ]
+categories: [ Product, Partnership, Regulatory, Financial ]
+house_style: |
+  Terse IR "First Read" voice. 1-2 sentences per item, factual, no hedging,
+  lead with the company and the event. Spell out credit/volume metrics.
+thresholds:
+  sigma_multiple: 2.0
+  rvol: 2.0
+  materiality_floor: 2
+  hot_materiality: 4
+  stale_after_min: 75
+delivery: { time: "07:00", tz: "America/New_York", recipients: [] }

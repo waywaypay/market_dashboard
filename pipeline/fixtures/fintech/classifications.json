@@ -1,0 +1,20 @@
+{
+  "_comment": "Canned classifier output keyed by surviving item id (ft-002 dedup'd, ft-014 dropped by look-ahead). ft-010 is materiality 1 and is dropped by the materiality floor. Categories drawn from the fintech taxonomy: Product, Partnership, Regulatory, Financial.",
+  "tldr": "Affirm gaps up ~11% on an exclusive Walmart OnePay BNPL deal; Upstart pops on an above-guidance preannounce while Shift4 slips on a $1.5B European acquisition.",
+  "by_item": {
+    "ft-001": { "ticker": "AFRM", "category": "Partnership", "materiality": 5, "summary": "Affirm signed an exclusive multiyear deal to power BNPL installment loans in Walmart's OnePay app across U.S. checkout, replacing the prior provider, with GMV contribution starting next quarter.", "is_subject_relevant": true },
+    "ft-003": { "ticker": "UPST", "category": "Financial", "materiality": 5, "summary": "Upstart preannounced Q2 revenue of $228-232M, above its $213M guidance, and reinstated full-year guidance on stronger funding-partner demand.", "is_subject_relevant": true },
+    "ft-004": { "ticker": null, "category": "Regulatory", "materiality": 4, "summary": "A federal court vacated the CFPB rule applying credit-card dispute and chargeback rules to BNPL lenders, easing near-term compliance though an appeal is possible.", "is_subject_relevant": true },
+    "ft-005": { "ticker": "SOFI", "category": "Financial", "materiality": 3, "summary": "SoFi topped 11 million members with record direct-deposit adoption, a key deposit-funding driver, and reiterated full-year EPS guidance.", "is_subject_relevant": false },
+    "ft-006": { "ticker": "XYZ", "category": "Product", "materiality": 4, "summary": "Block began a national rollout of Cash App Borrow after its bank partner cleared regulators, a key lever for Cash App monetization.", "is_subject_relevant": true },
+    "ft-007": { "ticker": "PYPL", "category": "Partnership", "materiality": 4, "summary": "PayPal struck a deal to add its branded checkout button across a major commerce platform's merchants, supporting transaction-margin-dollar growth.", "is_subject_relevant": false },
+    "ft-008": { "ticker": "HOOD", "category": "Product", "materiality": 3, "summary": "Robinhood launched tokenized U.S. equities for EU customers on a layer-2 chain, broadening its crypto and international lineup.", "is_subject_relevant": false },
+    "ft-009": { "ticker": "NU", "category": "Regulatory", "materiality": 4, "summary": "Nubank received a full banking license in Mexico, unlocking payroll accounts and a broader deposit and lending suite in its second-largest market.", "is_subject_relevant": false },
+    "ft-010": { "ticker": "TOST", "category": "Financial", "materiality": 1, "summary": "Toast will webcast a fireside chat at an upcoming investor conference.", "is_subject_relevant": false },
+    "ft-011": { "ticker": "BILL", "category": "Financial", "materiality": 3, "summary": "BILL Holdings reported record Spend & Expense card volume, lifting interchange-driven revenue on small-business adoption.", "is_subject_relevant": false },
+    "ft-012": { "ticker": "FOUR", "category": "Financial", "materiality": 4, "summary": "Shift4 agreed to acquire a European payments processor for about $1.5B to expand international acquiring, expecting EBITDA accretion within a year.", "is_subject_relevant": false },
+    "ft-013": { "ticker": "MQ", "category": "Partnership", "materiality": 4, "summary": "Marqeta renewed its core card-issuing program with Block through 2030, removing a major contract-concentration overhang on revised economics.", "is_subject_relevant": false },
+    "ft-015": { "ticker": null, "category": "Financial", "materiality": 3, "summary": "Subprime consumer delinquencies rose a third straight month, which analysts warn could lift funding costs and loss provisions for consumer lenders.", "is_subject_relevant": true },
+    "ft-016": { "ticker": "AFRM", "category": "Financial", "materiality": 3, "summary": "Affirm priced a $750M asset-backed securitization at tighter spreads than its prior deal, signaling improved funding conditions ahead of the holiday season.", "is_subject_relevant": true }
+  }
+}

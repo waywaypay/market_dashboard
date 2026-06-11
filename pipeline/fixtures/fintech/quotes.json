@@ -1,0 +1,16 @@
+{
+  "_comment": "Synthetic pre-market snapshot. Seeded unusual moves: AFRM (+11.2%, 3.4x rvol -> sigma+rvol, driver ft-001 the Walmart deal over lower-materiality ft-016), UPST (+9.7% vs sigma 4.5 -> sigma flag, driver ft-003), FOUR (-4.2% on the acquisition, 2.5x rvol -> rvol flag, driver ft-012).",
+  "quotes": [
+    { "ticker": "AFRM", "name": "Affirm",          "last": 72.40,  "chg_pct": 11.2, "volume": 18000000, "avg_volume": 5300000,  "sigma": 5.2 },
+    { "ticker": "UPST", "name": "Upstart",         "last": 64.18,  "chg_pct": 9.7,  "volume": 9200000,  "avg_volume": 6100000,  "sigma": 4.5 },
+    { "ticker": "SOFI", "name": "SoFi",            "last": 14.92,  "chg_pct": 2.4,  "volume": 41000000, "avg_volume": 52000000, "sigma": 3.4 },
+    { "ticker": "XYZ",  "name": "Block",           "last": 71.83,  "chg_pct": 3.1,  "volume": 9800000,  "avg_volume": 8200000,  "sigma": 3.6 },
+    { "ticker": "PYPL", "name": "PayPal",          "last": 78.55,  "chg_pct": 1.8,  "volume": 12000000, "avg_volume": 13500000, "sigma": 2.7 },
+    { "ticker": "HOOD", "name": "Robinhood",       "last": 96.27,  "chg_pct": 2.9,  "volume": 22000000, "avg_volume": 19000000, "sigma": 4.4 },
+    { "ticker": "NU",   "name": "Nubank",          "last": 13.61,  "chg_pct": 2.0,  "volume": 30000000, "avg_volume": 34000000, "sigma": 3.3 },
+    { "ticker": "TOST", "name": "Toast",           "last": 42.18,  "chg_pct": 0.6,  "volume": 3100000,  "avg_volume": 4500000,  "sigma": 3.1 },
+    { "ticker": "BILL", "name": "BILL Holdings",   "last": 53.74,  "chg_pct": 1.5,  "volume": 1700000,  "avg_volume": 2200000,  "sigma": 3.7 },
+    { "ticker": "FOUR", "name": "Shift4",          "last": 88.10,  "chg_pct": -4.2, "volume": 4500000,  "avg_volume": 1800000,  "sigma": 3.9 },
+    { "ticker": "MQ",   "name": "Marqeta",         "last": 4.55,   "chg_pct": 5.1,  "volume": 6200000,  "avg_volume": 7000000,  "sigma": 4.0 }
+  ]
+}

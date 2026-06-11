@@ -1,0 +1,623 @@
+{
+  "universe_id": "fintech",
+  "generated_at": "2026-06-11T05:25:49.926872Z",
+  "market_open_at": "2026-06-11T09:30:00-04:00",
+  "tldr": "Affirm gaps up ~11% on an exclusive Walmart OnePay BNPL deal; Upstart pops on an above-guidance preannounce while Shift4 slips on a $1.5B European acquisition.",
+  "counts": {
+    "total_items": 13,
+    "hot_items": 8
+  },
+  "market": [
+    {
+      "ticker": "AFRM",
+      "name": "Affirm",
+      "last": 72.4,
+      "chg_pct": 11.2,
+      "volume": 18000000,
+      "avg_volume": 5300000,
+      "sigma": 5.2,
+      "rvol": 3.4,
+      "flagged": true,
+      "flag_reason": "sigma+rvol",
+      "driver_item_id": "ft-001"
+    },
+    {
+      "ticker": "UPST",
+      "name": "Upstart",
+      "last": 64.18,
+      "chg_pct": 9.7,
+      "volume": 9200000,
+      "avg_volume": 6100000,
+      "sigma": 4.5,
+      "rvol": 1.51,
+      "flagged": true,
+      "flag_reason": "sigma",
+      "driver_item_id": "ft-003"
+    },
+    {
+      "ticker": "SOFI",
+      "name": "SoFi",
+      "last": 14.92,
+      "chg_pct": 2.4,
+      "volume": 41000000,
+      "avg_volume": 52000000,
+      "sigma": 3.4,
+      "rvol": 0.79,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "XYZ",
+      "name": "Block",
+      "last": 71.83,
+      "chg_pct": 3.1,
+      "volume": 9800000,
+      "avg_volume": 8200000,
+      "sigma": 3.6,
+      "rvol": 1.2,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "PYPL",
+      "name": "PayPal",
+      "last": 78.55,
+      "chg_pct": 1.8,
+      "volume": 12000000,
+      "avg_volume": 13500000,
+      "sigma": 2.7,
+      "rvol": 0.89,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "HOOD",
+      "name": "Robinhood",
+      "last": 96.27,
+      "chg_pct": 2.9,
+      "volume": 22000000,
+      "avg_volume": 19000000,
+      "sigma": 4.4,
+      "rvol": 1.16,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "NU",
+      "name": "Nubank",
+      "last": 13.61,
+      "chg_pct": 2.0,
+      "volume": 30000000,
+      "avg_volume": 34000000,
+      "sigma": 3.3,
+      "rvol": 0.88,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "TOST",
+      "name": "Toast",
+      "last": 42.18,
+      "chg_pct": 0.6,
+      "volume": 3100000,
+      "avg_volume": 4500000,
+      "sigma": 3.1,
+      "rvol": 0.69,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "BILL",
+      "name": "BILL Holdings",
+      "last": 53.74,
+      "chg_pct": 1.5,
+      "volume": 1700000,
+      "avg_volume": 2200000,
+      "sigma": 3.7,
+      "rvol": 0.77,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "FOUR",
+      "name": "Shift4",
+      "last": 88.1,
+      "chg_pct": -4.2,
+      "volume": 4500000,
+      "avg_volume": 1800000,
+      "sigma": 3.9,
+      "rvol": 2.5,
+      "flagged": true,
+      "flag_reason": "rvol",
+      "driver_item_id": "ft-012"
+    },
+    {
+      "ticker": "MQ",
+      "name": "Marqeta",
+      "last": 4.55,
+      "chg_pct": 5.1,
+      "volume": 6200000,
+      "avg_volume": 7000000,
+      "sigma": 4.0,
+      "rvol": 0.89,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    }
+  ],
+  "priority_signals": [
+    {
+      "id": "ft-001",
+      "ticker": "AFRM",
+      "company": "Affirm",
+      "category": "Partnership",
+      "materiality": 5,
+      "summary": "Affirm signed an exclusive multiyear deal to power BNPL installment loans in Walmart's OnePay app across U.S. checkout, replacing the prior provider, with GMV contribution starting next quarter.",
+      "title": "Affirm Signs Exclusive BNPL Agreement With Walmart OnePay",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000051/afrm-8k-walmart.htm",
+      "source": "EDGAR 8-K",
+      "ts": "2026-06-11T02:55:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "AFRM",
+        "chg_pct": 11.2,
+        "rvol": 3.4,
+        "flagged": true
+      },
+      "is_driver": true
+    },
+    {
+      "id": "ft-003",
+      "ticker": "UPST",
+      "company": "Upstart",
+      "category": "Financial",
+      "materiality": 5,
+      "summary": "Upstart preannounced Q2 revenue of $228-232M, above its $213M guidance, and reinstated full-year guidance on stronger funding-partner demand.",
+      "title": "Upstart Preannounces Q2 Revenue Above Guidance, Reinstates Full-Year Outlook",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001647639/000164763926000033/upst-8k-prelim.htm",
+      "source": "EDGAR 8-K",
+      "ts": "2026-06-11T03:57:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "UPST",
+        "chg_pct": 9.7,
+        "rvol": 1.51,
+        "flagged": true
+      },
+      "is_driver": true
+    },
+    {
+      "id": "ft-012",
+      "ticker": "FOUR",
+      "company": "Shift4",
+      "category": "Financial",
+      "materiality": 4,
+      "summary": "Shift4 agreed to acquire a European payments processor for about $1.5B to expand international acquiring, expecting EBITDA accretion within a year.",
+      "title": "Shift4 to Acquire European Payments Processor in $1.5B Deal",
+      "url": "https://www.reuters.com/markets/shift4-european-acquisition",
+      "source": "News Search",
+      "ts": "2026-06-11T02:45:49.926872Z",
+      "is_subject_relevant": false,
+      "price_reaction": {
+        "ticker": "FOUR",
+        "chg_pct": -4.2,
+        "rvol": 2.5,
+        "flagged": true
+      },
+      "is_driver": true
+    },
+    {
+      "id": "ft-009",
+      "ticker": "NU",
+      "company": "Nubank",
+      "category": "Regulatory",
+      "materiality": 4,
+      "summary": "Nubank received a full banking license in Mexico, unlocking payroll accounts and a broader deposit and lending suite in its second-largest market.",
+      "title": "Nubank Receives Full Banking License in Mexico",
+      "url": "https://www.americanbanker.com/news/nubank-mexico-banking-license",
+      "source": "American Banker",
+      "ts": "2026-06-11T02:20:49.926872Z",
+      "is_subject_relevant": false,
+      "price_reaction": {
+        "ticker": "NU",
+        "chg_pct": 2.0,
+        "rvol": 0.88,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "ft-007",
+      "ticker": "PYPL",
+      "company": "PayPal",
+      "category": "Partnership",
+      "materiality": 4,
+      "summary": "PayPal struck a deal to add its branded checkout button across a major commerce platform's merchants, supporting transaction-margin-dollar growth.",
+      "title": "PayPal Strikes Deal to Add Branded Checkout to Amazon-Powered Stores",
+      "url": "https://www.paymentsdive.com/news/paypal-amazon-buy-button-deal",
+      "source": "Payments Dive",
+      "ts": "2026-06-11T02:30:49.926872Z",
+      "is_subject_relevant": false,
+      "price_reaction": {
+        "ticker": "PYPL",
+        "chg_pct": 1.8,
+        "rvol": 0.89,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "ft-006",
+      "ticker": "XYZ",
+      "company": "Block",
+      "category": "Product",
+      "materiality": 4,
+      "summary": "Block began a national rollout of Cash App Borrow after its bank partner cleared regulators, a key lever for Cash App monetization.",
+      "title": "Block Expands Cash App Borrow Nationally After FDIC Clearance",
+      "url": "https://www.finextra.com/newsarticle/block-cash-app-borrow-national-rollout",
+      "source": "Finextra",
+      "ts": "2026-06-11T03:11:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "XYZ",
+        "chg_pct": 3.1,
+        "rvol": 1.2,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "ft-004",
+      "ticker": null,
+      "company": null,
+      "category": "Regulatory",
+      "materiality": 4,
+      "summary": "A federal court vacated the CFPB rule applying credit-card dispute and chargeback rules to BNPL lenders, easing near-term compliance though an appeal is possible.",
+      "title": "CFPB Interpretive Rule Treating BNPL as Credit Cards Vacated by Court",
+      "url": "https://www.americanbanker.com/news/cfpb-bnpl-credit-card-rule-vacated",
+      "source": "American Banker",
+      "ts": "2026-06-11T03:25:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": null,
+      "is_driver": false
+    },
+    {
+      "id": "ft-013",
+      "ticker": "MQ",
+      "company": "Marqeta",
+      "category": "Partnership",
+      "materiality": 4,
+      "summary": "Marqeta renewed its core card-issuing program with Block through 2030, removing a major contract-concentration overhang on revised economics.",
+      "title": "Marqeta Renews Core Program Agreement With Block Through 2030",
+      "url": "https://www.finextra.com/newsarticle/marqeta-renews-block-program-agreement",
+      "source": "Finextra",
+      "ts": "2026-06-11T04:22:49.926872Z",
+      "is_subject_relevant": false,
+      "price_reaction": {
+        "ticker": "MQ",
+        "chg_pct": 5.1,
+        "rvol": 0.89,
+        "flagged": false
+      },
+      "is_driver": false
+    }
+  ],
+  "by_company": {
+    "Affirm": [
+      {
+        "id": "ft-001",
+        "ticker": "AFRM",
+        "company": "Affirm",
+        "category": "Partnership",
+        "materiality": 5,
+        "summary": "Affirm signed an exclusive multiyear deal to power BNPL installment loans in Walmart's OnePay app across U.S. checkout, replacing the prior provider, with GMV contribution starting next quarter.",
+        "title": "Affirm Signs Exclusive BNPL Agreement With Walmart OnePay",
+        "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000051/afrm-8k-walmart.htm",
+        "source": "EDGAR 8-K",
+        "ts": "2026-06-11T02:55:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "AFRM",
+          "chg_pct": 11.2,
+          "rvol": 3.4,
+          "flagged": true
+        },
+        "is_driver": true
+      },
+      {
+        "id": "ft-016",
+        "ticker": "AFRM",
+        "company": "Affirm",
+        "category": "Financial",
+        "materiality": 3,
+        "summary": "Affirm priced a $750M asset-backed securitization at tighter spreads than its prior deal, signaling improved funding conditions ahead of the holiday season.",
+        "title": "Affirm Prices $750M Asset-Backed Securitization at Tighter Spreads",
+        "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000052/afrm-8k-abs.htm",
+        "source": "EDGAR 8-K",
+        "ts": "2026-06-11T04:03:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "AFRM",
+          "chg_pct": 11.2,
+          "rvol": 3.4,
+          "flagged": true
+        },
+        "is_driver": false
+      }
+    ],
+    "Upstart": [
+      {
+        "id": "ft-003",
+        "ticker": "UPST",
+        "company": "Upstart",
+        "category": "Financial",
+        "materiality": 5,
+        "summary": "Upstart preannounced Q2 revenue of $228-232M, above its $213M guidance, and reinstated full-year guidance on stronger funding-partner demand.",
+        "title": "Upstart Preannounces Q2 Revenue Above Guidance, Reinstates Full-Year Outlook",
+        "url": "https://www.sec.gov/Archives/edgar/data/0001647639/000164763926000033/upst-8k-prelim.htm",
+        "source": "EDGAR 8-K",
+        "ts": "2026-06-11T03:57:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "UPST",
+          "chg_pct": 9.7,
+          "rvol": 1.51,
+          "flagged": true
+        },
+        "is_driver": true
+      }
+    ],
+    "SoFi": [
+      {
+        "id": "ft-005",
+        "ticker": "SOFI",
+        "company": "SoFi",
+        "category": "Financial",
+        "materiality": 3,
+        "summary": "SoFi topped 11 million members with record direct-deposit adoption, a key deposit-funding driver, and reiterated full-year EPS guidance.",
+        "title": "SoFi Tops 11 Million Members as Direct Deposit Adoption Accelerates",
+        "url": "https://www.paymentsdive.com/news/sofi-charter-direct-deposit-milestone",
+        "source": "Payments Dive",
+        "ts": "2026-06-11T02:40:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "SOFI",
+          "chg_pct": 2.4,
+          "rvol": 0.79,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Block": [
+      {
+        "id": "ft-006",
+        "ticker": "XYZ",
+        "company": "Block",
+        "category": "Product",
+        "materiality": 4,
+        "summary": "Block began a national rollout of Cash App Borrow after its bank partner cleared regulators, a key lever for Cash App monetization.",
+        "title": "Block Expands Cash App Borrow Nationally After FDIC Clearance",
+        "url": "https://www.finextra.com/newsarticle/block-cash-app-borrow-national-rollout",
+        "source": "Finextra",
+        "ts": "2026-06-11T03:11:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "XYZ",
+          "chg_pct": 3.1,
+          "rvol": 1.2,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "PayPal": [
+      {
+        "id": "ft-007",
+        "ticker": "PYPL",
+        "company": "PayPal",
+        "category": "Partnership",
+        "materiality": 4,
+        "summary": "PayPal struck a deal to add its branded checkout button across a major commerce platform's merchants, supporting transaction-margin-dollar growth.",
+        "title": "PayPal Strikes Deal to Add Branded Checkout to Amazon-Powered Stores",
+        "url": "https://www.paymentsdive.com/news/paypal-amazon-buy-button-deal",
+        "source": "Payments Dive",
+        "ts": "2026-06-11T02:30:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "PYPL",
+          "chg_pct": 1.8,
+          "rvol": 0.89,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Robinhood": [
+      {
+        "id": "ft-008",
+        "ticker": "HOOD",
+        "company": "Robinhood",
+        "category": "Product",
+        "materiality": 3,
+        "summary": "Robinhood launched tokenized U.S. equities for EU customers on a layer-2 chain, broadening its crypto and international lineup.",
+        "title": "Robinhood Launches Tokenized U.S. Equities for EU Customers",
+        "url": "https://www.bloomberg.com/news/robinhood-tokenized-equities-eu",
+        "source": "News Search",
+        "ts": "2026-06-11T04:31:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "HOOD",
+          "chg_pct": 2.9,
+          "rvol": 1.16,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Nubank": [
+      {
+        "id": "ft-009",
+        "ticker": "NU",
+        "company": "Nubank",
+        "category": "Regulatory",
+        "materiality": 4,
+        "summary": "Nubank received a full banking license in Mexico, unlocking payroll accounts and a broader deposit and lending suite in its second-largest market.",
+        "title": "Nubank Receives Full Banking License in Mexico",
+        "url": "https://www.americanbanker.com/news/nubank-mexico-banking-license",
+        "source": "American Banker",
+        "ts": "2026-06-11T02:20:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "NU",
+          "chg_pct": 2.0,
+          "rvol": 0.88,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "BILL Holdings": [
+      {
+        "id": "ft-011",
+        "ticker": "BILL",
+        "company": "BILL Holdings",
+        "category": "Financial",
+        "materiality": 3,
+        "summary": "BILL Holdings reported record Spend & Expense card volume, lifting interchange-driven revenue on small-business adoption.",
+        "title": "BILL Holdings Reports Record Spend & Expense Card Volume",
+        "url": "https://www.paymentsdive.com/news/bill-spend-expense-card-volume",
+        "source": "Payments Dive",
+        "ts": "2026-06-11T01:55:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "BILL",
+          "chg_pct": 1.5,
+          "rvol": 0.77,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Shift4": [
+      {
+        "id": "ft-012",
+        "ticker": "FOUR",
+        "company": "Shift4",
+        "category": "Financial",
+        "materiality": 4,
+        "summary": "Shift4 agreed to acquire a European payments processor for about $1.5B to expand international acquiring, expecting EBITDA accretion within a year.",
+        "title": "Shift4 to Acquire European Payments Processor in $1.5B Deal",
+        "url": "https://www.reuters.com/markets/shift4-european-acquisition",
+        "source": "News Search",
+        "ts": "2026-06-11T02:45:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "FOUR",
+          "chg_pct": -4.2,
+          "rvol": 2.5,
+          "flagged": true
+        },
+        "is_driver": true
+      }
+    ],
+    "Marqeta": [
+      {
+        "id": "ft-013",
+        "ticker": "MQ",
+        "company": "Marqeta",
+        "category": "Partnership",
+        "materiality": 4,
+        "summary": "Marqeta renewed its core card-issuing program with Block through 2030, removing a major contract-concentration overhang on revised economics.",
+        "title": "Marqeta Renews Core Program Agreement With Block Through 2030",
+        "url": "https://www.finextra.com/newsarticle/marqeta-renews-block-program-agreement",
+        "source": "Finextra",
+        "ts": "2026-06-11T04:22:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "MQ",
+          "chg_pct": 5.1,
+          "rvol": 0.89,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ]
+  },
+  "sector_headlines": [
+    {
+      "id": "ft-004",
+      "ticker": null,
+      "company": null,
+      "category": "Regulatory",
+      "materiality": 4,
+      "summary": "A federal court vacated the CFPB rule applying credit-card dispute and chargeback rules to BNPL lenders, easing near-term compliance though an appeal is possible.",
+      "title": "CFPB Interpretive Rule Treating BNPL as Credit Cards Vacated by Court",
+      "url": "https://www.americanbanker.com/news/cfpb-bnpl-credit-card-rule-vacated",
+      "source": "American Banker",
+      "ts": "2026-06-11T03:25:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": null,
+      "is_driver": false
+    },
+    {
+      "id": "ft-015",
+      "ticker": null,
+      "company": null,
+      "category": "Financial",
+      "materiality": 3,
+      "summary": "Subprime consumer delinquencies rose a third straight month, which analysts warn could lift funding costs and loss provisions for consumer lenders.",
+      "title": "Subprime Consumer Delinquencies Tick Up, Pressuring Lender Funding Costs",
+      "url": "https://www.americanbanker.com/news/consumer-credit-delinquency-subprime-watch",
+      "source": "American Banker",
+      "ts": "2026-06-11T01:20:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": null,
+      "is_driver": false
+    }
+  ],
+  "source_status": [
+    {
+      "provider": "rss",
+      "status": "ok",
+      "last_ts": "2026-06-11T04:22:49.926872Z",
+      "detail": null
+    },
+    {
+      "provider": "edgar",
+      "status": "stale",
+      "last_ts": "2026-06-11T04:03:49.926872Z",
+      "detail": "newest EDGAR pull is 82 min old — feed may be stale"
+    },
+    {
+      "provider": "news",
+      "status": "ok",
+      "last_ts": "2026-06-11T04:31:49.926872Z",
+      "detail": null
+    },
+    {
+      "provider": "quotes",
+      "status": "ok",
+      "last_ts": "2026-06-11T05:25:49.926872Z",
+      "detail": null
+    }
+  ],
+  "universe_label": "Consumer Fintech & Payments",
+  "subject_ticker": "AFRM",
+  "subject_name": "Affirm",
+  "categories": [
+    "Product",
+    "Partnership",
+    "Regulatory",
+    "Financial"
+  ],
+  "display_tz": "America/New_York",
+  "classifier_engine": "fixture"
+}

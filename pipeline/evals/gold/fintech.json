@@ -1,0 +1,15 @@
+{
+  "_comment": "Gold labels for the fintech universe — proves the handoff gate is config-driven, not hardcoded to one taxonomy.",
+  "universe": "fintech",
+  "labels": {
+    "ft-001": { "category": "Partnership", "materiality_min": 4, "materiality_max": 5, "is_subject_relevant": true },
+    "ft-003": { "category": "Financial",   "materiality_min": 4, "materiality_max": 5, "is_subject_relevant": true },
+    "ft-004": { "category": "Regulatory",  "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": true },
+    "ft-006": { "category": "Product",     "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": true },
+    "ft-007": { "category": "Partnership", "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": false },
+    "ft-009": { "category": "Regulatory",  "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": false },
+    "ft-010": { "category": "Financial",   "materiality_min": 1, "materiality_max": 1, "is_subject_relevant": false },
+    "ft-012": { "category": "Financial",   "materiality_min": 3, "materiality_max": 5, "is_subject_relevant": false },
+    "ft-015": { "category": "Financial",   "materiality_min": 2, "materiality_max": 4, "is_subject_relevant": true }
+  }
+}

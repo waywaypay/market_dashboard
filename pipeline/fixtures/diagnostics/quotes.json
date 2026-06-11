@@ -1,0 +1,17 @@
+{
+  "_comment": "Synthetic pre-market snapshot. Seeded unusual moves: NTRA (+8.4%, 3.15x rvol -> sigma+rvol flag, driver dx-001), GH (-5.9% vs sigma 2.8 -> sigma flag, driver dx-004 over lower-materiality dx-018), WGS (2.68x rvol -> rvol flag, driver dx-005).",
+  "quotes": [
+    { "ticker": "VCYT", "name": "Veracyte",                 "last": 27.84,  "chg_pct": 1.2,  "volume": 310000,   "avg_volume": 480000,  "sigma": 2.6 },
+    { "ticker": "NTRA", "name": "Natera",                   "last": 168.42, "chg_pct": 8.4,  "volume": 4100000,  "avg_volume": 1300000, "sigma": 3.1 },
+    { "ticker": "GH",   "name": "Guardant Health",          "last": 41.20,  "chg_pct": -5.9, "volume": 2900000,  "avg_volume": 1800000, "sigma": 2.8 },
+    { "ticker": "ADPT", "name": "Adaptive Biotechnologies", "last": 8.12,   "chg_pct": 0.7,  "volume": 600000,   "avg_volume": 850000,  "sigma": 3.5 },
+    { "ticker": "TEM",  "name": "Tempus AI",                "last": 61.30,  "chg_pct": 2.2,  "volume": 2100000,  "avg_volume": 1900000, "sigma": 4.1 },
+    { "ticker": "CAI",  "name": "Caris Life Sciences",      "last": 24.66,  "chg_pct": -1.4, "volume": 700000,   "avg_volume": 800000,  "sigma": 3.2 },
+    { "ticker": "PSNL", "name": "Personalis",               "last": 5.88,   "chg_pct": 0.3,  "volume": 400000,   "avg_volume": 700000,  "sigma": 4.0 },
+    { "ticker": "WGS",  "name": "GeneDx",                   "last": 88.91,  "chg_pct": 3.9,  "volume": 1500000,  "avg_volume": 560000,  "sigma": 4.2 },
+    { "ticker": "BDSX", "name": "Biodesix",                 "last": 1.92,   "chg_pct": -0.5, "volume": 220000,   "avg_volume": 400000,  "sigma": 3.8 },
+    { "ticker": "CSTL", "name": "Castle Biosciences",       "last": 23.41,  "chg_pct": 0.9,  "volume": 180000,   "avg_volume": 300000,  "sigma": 2.9 },
+    { "ticker": "MYGN", "name": "Myriad Genetics",          "last": 11.27,  "chg_pct": -2.1, "volume": 1100000,  "avg_volume": 1450000, "sigma": 3.3 },
+    { "ticker": "BLLN", "name": "BillionToOne",             "last": 58.05,  "chg_pct": 1.1,  "volume": 90000,    "avg_volume": 150000,  "sigma": 3.6 }
+  ]
+}

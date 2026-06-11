@@ -1,0 +1,165 @@
+{
+  "_comment": "Synthetic pre-market wire for the fintech universe. Same structural seeds as diagnostics: ft-002 duplicates ft-001 (dedupe), ft-014 is future-dated (look-ahead guard), ft-010 is materiality-1 noise (floor), EDGAR newest pull is >75min old (stale health).",
+  "items": [
+    {
+      "id": "ft-001",
+      "provider": "edgar",
+      "feed": "EDGAR 8-K",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000051/afrm-8k-walmart.htm",
+      "title": "Affirm Signs Exclusive BNPL Agreement With Walmart OnePay",
+      "raw_text": "Affirm disclosed an exclusive multiyear agreement to power buy-now-pay-later installment loans through Walmart's OnePay app across Walmart U.S. checkout, online and in-store. The deal replaces a prior provider and Affirm said it expects a meaningful GMV contribution beginning in the September quarter.",
+      "ts_offset_min": -150,
+      "ticker_guess": "AFRM"
+    },
+    {
+      "id": "ft-002",
+      "provider": "news",
+      "feed": "News Search",
+      "url": "https://sec.gov/Archives/edgar/data/0001824434/000182443426000051/afrm-8k-walmart.htm?utm_campaign=wire",
+      "title": "Affirm Lands Exclusive OnePay Buy Now Pay Later Deal at Walmart",
+      "raw_text": "Affirm will exclusively power installment lending in Walmart's OnePay app, replacing the prior BNPL provider across U.S. checkout.",
+      "ts_offset_min": -143,
+      "ticker_guess": "AFRM"
+    },
+    {
+      "id": "ft-003",
+      "provider": "edgar",
+      "feed": "EDGAR 8-K",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001647639/000164763926000033/upst-8k-prelim.htm",
+      "title": "Upstart Preannounces Q2 Revenue Above Guidance, Reinstates Full-Year Outlook",
+      "raw_text": "Upstart preannounced preliminary Q2 revenue of $228-232 million, above its prior $213 million guidance, citing improved funding-partner demand and conversion gains. The company reinstated full-year revenue guidance it had previously withdrawn.",
+      "ts_offset_min": -88,
+      "ticker_guess": "UPST"
+    },
+    {
+      "id": "ft-004",
+      "provider": "rss",
+      "feed": "American Banker",
+      "url": "https://www.americanbanker.com/news/cfpb-bnpl-credit-card-rule-vacated",
+      "title": "CFPB Interpretive Rule Treating BNPL as Credit Cards Vacated by Court",
+      "raw_text": "A federal court vacated the CFPB interpretive rule that applied Truth in Lending credit-card dispute and chargeback requirements to buy-now-pay-later lenders. Industry groups called it a compliance reprieve, though the bureau may appeal or re-propose.",
+      "ts_offset_min": -120,
+      "ticker_guess": null
+    },
+    {
+      "id": "ft-005",
+      "provider": "rss",
+      "feed": "Payments Dive",
+      "url": "https://www.paymentsdive.com/news/sofi-charter-direct-deposit-milestone",
+      "title": "SoFi Tops 11 Million Members as Direct Deposit Adoption Accelerates",
+      "raw_text": "SoFi said it surpassed 11 million members and reported record direct-deposit adoption among new checking customers, a key driver of deposit funding costs. Management reiterated its full-year EPS guidance.",
+      "ts_offset_min": -165,
+      "ticker_guess": "SOFI"
+    },
+    {
+      "id": "ft-006",
+      "provider": "rss",
+      "feed": "Finextra",
+      "url": "https://www.finextra.com/newsarticle/block-cash-app-borrow-national-rollout",
+      "title": "Block Expands Cash App Borrow Nationally After FDIC Clearance",
+      "raw_text": "Block began a national rollout of Cash App Borrow short-term lending after its bank partner received regulatory clearance, extending access to most U.S. states. Block framed the product as a key lever for Cash App monetization and gross-profit growth.",
+      "ts_offset_min": -134,
+      "ticker_guess": "XYZ"
+    },
+    {
+      "id": "ft-007",
+      "provider": "rss",
+      "feed": "Payments Dive",
+      "url": "https://www.paymentsdive.com/news/paypal-amazon-buy-button-deal",
+      "title": "PayPal Strikes Deal to Add Branded Checkout to Amazon-Powered Stores",
+      "raw_text": "PayPal announced an agreement to offer its branded checkout button across merchants on a major commerce platform, expanding branded-checkout reach. PayPal said the partnership supports its transaction-margin-dollar growth target.",
+      "ts_offset_min": -175,
+      "ticker_guess": "PYPL"
+    },
+    {
+      "id": "ft-008",
+      "provider": "news",
+      "feed": "News Search",
+      "url": "https://www.bloomberg.com/news/robinhood-tokenized-equities-eu",
+      "title": "Robinhood Launches Tokenized U.S. Equities for EU Customers",
+      "raw_text": "Robinhood launched tokenized U.S. stock and ETF trading for European Union customers on a layer-2 blockchain, with plans to extend to private-company exposure. The launch broadens Robinhood's crypto and international product line.",
+      "ts_offset_min": -54,
+      "ticker_guess": "HOOD"
+    },
+    {
+      "id": "ft-009",
+      "provider": "rss",
+      "feed": "American Banker",
+      "url": "https://www.americanbanker.com/news/nubank-mexico-banking-license",
+      "title": "Nubank Receives Full Banking License in Mexico",
+      "raw_text": "Nubank received approval for a full banking license in Mexico, allowing it to offer payroll accounts and a broader deposit and lending suite in its second-largest market. The company said the license supports faster funding-cost improvement.",
+      "ts_offset_min": -185,
+      "ticker_guess": "NU"
+    },
+    {
+      "id": "ft-010",
+      "provider": "rss",
+      "feed": "Fintech Brainfood",
+      "url": "https://www.fintechbrainfood.com/events/toast-investor-webcast",
+      "title": "Toast to Webcast Presentation at Upcoming Investor Conference",
+      "raw_text": "Toast said it will webcast a fireside chat at an upcoming investor conference. A replay will be posted to the company's investor relations website.",
+      "ts_offset_min": -310,
+      "ticker_guess": "TOST"
+    },
+    {
+      "id": "ft-011",
+      "provider": "rss",
+      "feed": "Payments Dive",
+      "url": "https://www.paymentsdive.com/news/bill-spend-expense-card-volume",
+      "title": "BILL Holdings Reports Record Spend & Expense Card Volume",
+      "raw_text": "BILL Holdings said its Spend & Expense card payment volume hit a quarterly record, lifting interchange-driven revenue. Management pointed to small-business adoption as the growth driver.",
+      "ts_offset_min": -210,
+      "ticker_guess": "BILL"
+    },
+    {
+      "id": "ft-012",
+      "provider": "news",
+      "feed": "News Search",
+      "url": "https://www.reuters.com/markets/shift4-european-acquisition",
+      "title": "Shift4 to Acquire European Payments Processor in $1.5B Deal",
+      "raw_text": "Shift4 agreed to acquire a European payments processor for about $1.5 billion to expand its international acquiring footprint. Shift4 said the deal is expected to be accretive to adjusted EBITDA within the first year.",
+      "ts_offset_min": -160,
+      "ticker_guess": "FOUR"
+    },
+    {
+      "id": "ft-013",
+      "provider": "rss",
+      "feed": "Finextra",
+      "url": "https://www.finextra.com/newsarticle/marqeta-renews-block-program-agreement",
+      "title": "Marqeta Renews Core Program Agreement With Block Through 2030",
+      "raw_text": "Marqeta renewed its core card-issuing program agreement with Block through 2030, removing a key contract-concentration overhang. The renewal preserves Marqeta's largest customer relationship on revised economics.",
+      "ts_offset_min": -63,
+      "ticker_guess": "MQ"
+    },
+    {
+      "id": "ft-014",
+      "provider": "news",
+      "feed": "News Search",
+      "url": "https://www.businesswire.com/affirm-investor-call-live",
+      "title": "Affirm Investor Call on Walmart Deal Begins",
+      "raw_text": "Affirm's investor call to discuss the Walmart OnePay agreement is scheduled to begin at 9:00 a.m. ET. Management will take analyst questions afterward.",
+      "ts_offset_min": 30,
+      "ticker_guess": "AFRM"
+    },
+    {
+      "id": "ft-015",
+      "provider": "rss",
+      "feed": "American Banker",
+      "url": "https://www.americanbanker.com/news/consumer-credit-delinquency-subprime-watch",
+      "title": "Subprime Consumer Delinquencies Tick Up, Pressuring Lender Funding Costs",
+      "raw_text": "New data show subprime consumer loan delinquencies rose for a third straight month, with credit-card and installment categories leading. Analysts warned the trend could raise funding costs and loss provisions for consumer lenders into the back half.",
+      "ts_offset_min": -245,
+      "ticker_guess": null
+    },
+    {
+      "id": "ft-016",
+      "provider": "edgar",
+      "feed": "EDGAR 8-K",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001824434/000182443426000052/afrm-8k-abs.htm",
+      "title": "Affirm Prices $750M Asset-Backed Securitization at Tighter Spreads",
+      "raw_text": "Affirm priced a $750 million asset-backed securitization of installment loans at spreads tighter than its prior deal, signaling improved funding conditions. The proceeds will support origination capacity heading into the holiday season.",
+      "ts_offset_min": -82,
+      "ticker_guess": "AFRM"
+    }
+  ]
+}

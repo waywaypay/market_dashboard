@@ -1,0 +1,715 @@
+{
+  "universe_id": "diagnostics",
+  "generated_at": "2026-06-11T05:25:49.926872Z",
+  "market_open_at": "2026-06-11T09:30:00-04:00",
+  "tldr": "Natera leads pre-market up ~8% after CMS expands Signatera breast-cancer coverage; Guardant slides on a Shield rate cut and GeneDx pops on an above-guidance preannounce.",
+  "counts": {
+    "total_items": 16,
+    "hot_items": 9
+  },
+  "market": [
+    {
+      "ticker": "VCYT",
+      "name": "Veracyte",
+      "last": 27.84,
+      "chg_pct": 1.2,
+      "volume": 310000,
+      "avg_volume": 480000,
+      "sigma": 2.6,
+      "rvol": 0.65,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "NTRA",
+      "name": "Natera",
+      "last": 168.42,
+      "chg_pct": 8.4,
+      "volume": 4100000,
+      "avg_volume": 1300000,
+      "sigma": 3.1,
+      "rvol": 3.15,
+      "flagged": true,
+      "flag_reason": "sigma+rvol",
+      "driver_item_id": "dx-001"
+    },
+    {
+      "ticker": "GH",
+      "name": "Guardant Health",
+      "last": 41.2,
+      "chg_pct": -5.9,
+      "volume": 2900000,
+      "avg_volume": 1800000,
+      "sigma": 2.8,
+      "rvol": 1.61,
+      "flagged": true,
+      "flag_reason": "sigma",
+      "driver_item_id": "dx-004"
+    },
+    {
+      "ticker": "ADPT",
+      "name": "Adaptive Biotechnologies",
+      "last": 8.12,
+      "chg_pct": 0.7,
+      "volume": 600000,
+      "avg_volume": 850000,
+      "sigma": 3.5,
+      "rvol": 0.71,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "TEM",
+      "name": "Tempus AI",
+      "last": 61.3,
+      "chg_pct": 2.2,
+      "volume": 2100000,
+      "avg_volume": 1900000,
+      "sigma": 4.1,
+      "rvol": 1.11,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "CAI",
+      "name": "Caris Life Sciences",
+      "last": 24.66,
+      "chg_pct": -1.4,
+      "volume": 700000,
+      "avg_volume": 800000,
+      "sigma": 3.2,
+      "rvol": 0.88,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "PSNL",
+      "name": "Personalis",
+      "last": 5.88,
+      "chg_pct": 0.3,
+      "volume": 400000,
+      "avg_volume": 700000,
+      "sigma": 4.0,
+      "rvol": 0.57,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "WGS",
+      "name": "GeneDx",
+      "last": 88.91,
+      "chg_pct": 3.9,
+      "volume": 1500000,
+      "avg_volume": 560000,
+      "sigma": 4.2,
+      "rvol": 2.68,
+      "flagged": true,
+      "flag_reason": "rvol",
+      "driver_item_id": "dx-005"
+    },
+    {
+      "ticker": "BDSX",
+      "name": "Biodesix",
+      "last": 1.92,
+      "chg_pct": -0.5,
+      "volume": 220000,
+      "avg_volume": 400000,
+      "sigma": 3.8,
+      "rvol": 0.55,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "CSTL",
+      "name": "Castle Biosciences",
+      "last": 23.41,
+      "chg_pct": 0.9,
+      "volume": 180000,
+      "avg_volume": 300000,
+      "sigma": 2.9,
+      "rvol": 0.6,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "MYGN",
+      "name": "Myriad Genetics",
+      "last": 11.27,
+      "chg_pct": -2.1,
+      "volume": 1100000,
+      "avg_volume": 1450000,
+      "sigma": 3.3,
+      "rvol": 0.76,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    },
+    {
+      "ticker": "BLLN",
+      "name": "BillionToOne",
+      "last": 58.05,
+      "chg_pct": 1.1,
+      "volume": 90000,
+      "avg_volume": 150000,
+      "sigma": 3.6,
+      "rvol": 0.6,
+      "flagged": false,
+      "flag_reason": null,
+      "driver_item_id": null
+    }
+  ],
+  "priority_signals": [
+    {
+      "id": "dx-004",
+      "ticker": "GH",
+      "company": "Guardant Health",
+      "category": "Regulatory",
+      "materiality": 5,
+      "summary": "CMS issued a preliminary gapfill cutting Guardant's Shield colorectal screening rate to $720 from $920; Guardant will seek reconsideration.",
+      "title": "Guardant Health Discloses CMS Preliminary Rate Cut for Shield CRC Screening Test",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001576280/000157628026000031/gh-8k-shield.htm",
+      "source": "EDGAR 8-K",
+      "ts": "2026-06-11T02:27:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "GH",
+        "chg_pct": -5.9,
+        "rvol": 1.61,
+        "flagged": true
+      },
+      "is_driver": true
+    },
+    {
+      "id": "dx-001",
+      "ticker": "NTRA",
+      "company": "Natera",
+      "category": "Regulatory",
+      "materiality": 5,
+      "summary": "CMS expanded Medicare coverage for Natera's Signatera MRD test to adjuvant and recurrence monitoring in breast cancer, adding an estimated 180,000 covered patients a year.",
+      "title": "CMS Expands Medicare Coverage for Natera's Signatera MRD Test in Breast Cancer",
+      "url": "https://www.genomeweb.com/molecular-diagnostics/natera-signatera-medicare-breast-cancer",
+      "source": "GenomeWeb",
+      "ts": "2026-06-11T03:13:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "NTRA",
+        "chg_pct": 8.4,
+        "rvol": 3.15,
+        "flagged": true
+      },
+      "is_driver": true
+    },
+    {
+      "id": "dx-005",
+      "ticker": "WGS",
+      "company": "GeneDx",
+      "category": "Financial",
+      "materiality": 5,
+      "summary": "GeneDx preannounced Q2 revenue of $112-115M, well above its $102-106M guidance, on exome and genome volume strength.",
+      "title": "GeneDx Preannounces Q2 Revenue Above Guidance on Exome Volume Strength",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001818331/000181833126000022/wgs-8k-prelim.htm",
+      "source": "EDGAR 8-K",
+      "ts": "2026-06-11T04:03:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "WGS",
+        "chg_pct": 3.9,
+        "rvol": 2.68,
+        "flagged": true
+      },
+      "is_driver": true
+    },
+    {
+      "id": "dx-008",
+      "ticker": "ADPT",
+      "company": "Adaptive Biotechnologies",
+      "category": "Clinical",
+      "materiality": 4,
+      "summary": "An NEJM myeloma study using Adaptive's clonoSEQ showed MRD-guided therapy de-escalation preserved outcomes, reinforcing clonoSEQ as a trial endpoint standard.",
+      "title": "Adaptive's clonoSEQ MRD Data Published in NEJM Myeloma Study",
+      "url": "https://www.genomeweb.com/mrd/adaptive-clonoseq-nejm-myeloma",
+      "source": "GenomeWeb",
+      "ts": "2026-06-11T01:05:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "ADPT",
+        "chg_pct": 0.7,
+        "rvol": 0.71,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "dx-003",
+      "ticker": "VCYT",
+      "company": "Veracyte",
+      "category": "Clinical",
+      "materiality": 4,
+      "summary": "Veracyte's Decipher Prostate was added to updated NCCN guidelines at level 1B evidence, the only gene-expression test at that tier across localized risk groups.",
+      "title": "Veracyte Reports Decipher Prostate Inclusion in Updated NCCN Guidelines",
+      "url": "https://www.sec.gov/Archives/edgar/data/0001384101/000138410126000045/vcyt-8k-ex991.htm",
+      "source": "EDGAR 8-K",
+      "ts": "2026-06-11T01:55:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "VCYT",
+        "chg_pct": 1.2,
+        "rvol": 0.65,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "dx-007",
+      "ticker": "MYGN",
+      "company": "Myriad Genetics",
+      "category": "Commercial",
+      "materiality": 4,
+      "summary": "Myriad will lose its UnitedHealthcare national contract for GeneSight on September 1, pressuring about $45M of annualized revenue.",
+      "title": "Myriad Genetics Loses UnitedHealthcare Contract for GeneSight",
+      "url": "https://www.fiercebiotech.com/diagnostics/myriad-genesight-unitedhealthcare-contract",
+      "source": "Fierce Diagnostics",
+      "ts": "2026-06-11T02:05:49.926872Z",
+      "is_subject_relevant": false,
+      "price_reaction": {
+        "ticker": "MYGN",
+        "chg_pct": -2.1,
+        "rvol": 0.76,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "dx-014",
+      "ticker": "CAI",
+      "company": "Caris Life Sciences",
+      "category": "Regulatory",
+      "materiality": 4,
+      "summary": "Caris received FDA Breakthrough Device designation for its blood-based therapy-selection assay in solid tumors, accelerating its planned PMA submission.",
+      "title": "Caris Life Sciences Receives FDA Breakthrough Device Designation for Blood-Based Assay",
+      "url": "https://www.fiercebiotech.com/diagnostics/caris-breakthrough-blood-assay",
+      "source": "Fierce Diagnostics",
+      "ts": "2026-06-11T02:15:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "CAI",
+        "chg_pct": -1.4,
+        "rvol": 0.88,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "dx-006",
+      "ticker": "TEM",
+      "company": "Tempus AI",
+      "category": "Commercial",
+      "materiality": 4,
+      "summary": "Tempus and AstraZeneca expanded their partnership to co-develop a tumor-informed MRD algorithm on the xM platform, starting in lung and breast trials.",
+      "title": "Tempus, AstraZeneca Expand Partnership to MRD Algorithm Development",
+      "url": "https://www.precisiononcologynews.com/tempus-astrazeneca-mrd-expansion",
+      "source": "Precision Oncology News",
+      "ts": "2026-06-11T02:51:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": {
+        "ticker": "TEM",
+        "chg_pct": 2.2,
+        "rvol": 1.11,
+        "flagged": false
+      },
+      "is_driver": false
+    },
+    {
+      "id": "dx-009",
+      "ticker": null,
+      "company": null,
+      "category": "Regulatory",
+      "materiality": 4,
+      "summary": "FDA finalized its phase-two LDT enforcement timeline, requiring registration, listing and adverse-event reporting for most lab tests within 12 months as legal challenges continue.",
+      "title": "FDA Finalizes Timeline for Phase Two of LDT Enforcement",
+      "url": "https://www.statnews.com/2026/06/fda-ldt-enforcement-phase-two",
+      "source": "STAT",
+      "ts": "2026-06-11T04:27:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": null,
+      "is_driver": false
+    }
+  ],
+  "by_company": {
+    "Veracyte": [
+      {
+        "id": "dx-003",
+        "ticker": "VCYT",
+        "company": "Veracyte",
+        "category": "Clinical",
+        "materiality": 4,
+        "summary": "Veracyte's Decipher Prostate was added to updated NCCN guidelines at level 1B evidence, the only gene-expression test at that tier across localized risk groups.",
+        "title": "Veracyte Reports Decipher Prostate Inclusion in Updated NCCN Guidelines",
+        "url": "https://www.sec.gov/Archives/edgar/data/0001384101/000138410126000045/vcyt-8k-ex991.htm",
+        "source": "EDGAR 8-K",
+        "ts": "2026-06-11T01:55:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "VCYT",
+          "chg_pct": 1.2,
+          "rvol": 0.65,
+          "flagged": false
+        },
+        "is_driver": false
+      },
+      {
+        "id": "dx-019",
+        "ticker": "VCYT",
+        "company": "Veracyte",
+        "category": "Financial",
+        "materiality": 2,
+        "summary": "Veracyte set August 4 for its Q2 2026 earnings release; consensus models about 11% testing-revenue growth.",
+        "title": "Veracyte Announces Date of Q2 2026 Earnings Call",
+        "url": "https://www.sec.gov/Archives/edgar/data/0001384101/000138410126000046/vcyt-8k-earningsdate.htm",
+        "source": "EDGAR 8-K",
+        "ts": "2026-06-10T23:35:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "VCYT",
+          "chg_pct": 1.2,
+          "rvol": 0.65,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Natera": [
+      {
+        "id": "dx-001",
+        "ticker": "NTRA",
+        "company": "Natera",
+        "category": "Regulatory",
+        "materiality": 5,
+        "summary": "CMS expanded Medicare coverage for Natera's Signatera MRD test to adjuvant and recurrence monitoring in breast cancer, adding an estimated 180,000 covered patients a year.",
+        "title": "CMS Expands Medicare Coverage for Natera's Signatera MRD Test in Breast Cancer",
+        "url": "https://www.genomeweb.com/molecular-diagnostics/natera-signatera-medicare-breast-cancer",
+        "source": "GenomeWeb",
+        "ts": "2026-06-11T03:13:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "NTRA",
+          "chg_pct": 8.4,
+          "rvol": 3.15,
+          "flagged": true
+        },
+        "is_driver": true
+      }
+    ],
+    "Guardant Health": [
+      {
+        "id": "dx-004",
+        "ticker": "GH",
+        "company": "Guardant Health",
+        "category": "Regulatory",
+        "materiality": 5,
+        "summary": "CMS issued a preliminary gapfill cutting Guardant's Shield colorectal screening rate to $720 from $920; Guardant will seek reconsideration.",
+        "title": "Guardant Health Discloses CMS Preliminary Rate Cut for Shield CRC Screening Test",
+        "url": "https://www.sec.gov/Archives/edgar/data/0001576280/000157628026000031/gh-8k-shield.htm",
+        "source": "EDGAR 8-K",
+        "ts": "2026-06-11T02:27:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "GH",
+          "chg_pct": -5.9,
+          "rvol": 1.61,
+          "flagged": true
+        },
+        "is_driver": true
+      },
+      {
+        "id": "dx-018",
+        "ticker": "GH",
+        "company": "Guardant Health",
+        "category": "Clinical",
+        "materiality": 3,
+        "summary": "Guardant's Reveal ctDNA assay detected colorectal recurrence a median 5.2 months ahead of imaging in a JCO surveillance study.",
+        "title": "Guardant Reveal ctDNA Surveillance Data Published in JCO",
+        "url": "https://www.onclive.com/guardant-reveal-jco-surveillance",
+        "source": "News Search",
+        "ts": "2026-06-11T03:05:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "GH",
+          "chg_pct": -5.9,
+          "rvol": 1.61,
+          "flagged": true
+        },
+        "is_driver": false
+      }
+    ],
+    "Adaptive Biotechnologies": [
+      {
+        "id": "dx-008",
+        "ticker": "ADPT",
+        "company": "Adaptive Biotechnologies",
+        "category": "Clinical",
+        "materiality": 4,
+        "summary": "An NEJM myeloma study using Adaptive's clonoSEQ showed MRD-guided therapy de-escalation preserved outcomes, reinforcing clonoSEQ as a trial endpoint standard.",
+        "title": "Adaptive's clonoSEQ MRD Data Published in NEJM Myeloma Study",
+        "url": "https://www.genomeweb.com/mrd/adaptive-clonoseq-nejm-myeloma",
+        "source": "GenomeWeb",
+        "ts": "2026-06-11T01:05:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "ADPT",
+          "chg_pct": 0.7,
+          "rvol": 0.71,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Tempus AI": [
+      {
+        "id": "dx-006",
+        "ticker": "TEM",
+        "company": "Tempus AI",
+        "category": "Commercial",
+        "materiality": 4,
+        "summary": "Tempus and AstraZeneca expanded their partnership to co-develop a tumor-informed MRD algorithm on the xM platform, starting in lung and breast trials.",
+        "title": "Tempus, AstraZeneca Expand Partnership to MRD Algorithm Development",
+        "url": "https://www.precisiononcologynews.com/tempus-astrazeneca-mrd-expansion",
+        "source": "Precision Oncology News",
+        "ts": "2026-06-11T02:51:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "TEM",
+          "chg_pct": 2.2,
+          "rvol": 1.11,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Caris Life Sciences": [
+      {
+        "id": "dx-014",
+        "ticker": "CAI",
+        "company": "Caris Life Sciences",
+        "category": "Regulatory",
+        "materiality": 4,
+        "summary": "Caris received FDA Breakthrough Device designation for its blood-based therapy-selection assay in solid tumors, accelerating its planned PMA submission.",
+        "title": "Caris Life Sciences Receives FDA Breakthrough Device Designation for Blood-Based Assay",
+        "url": "https://www.fiercebiotech.com/diagnostics/caris-breakthrough-blood-assay",
+        "source": "Fierce Diagnostics",
+        "ts": "2026-06-11T02:15:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "CAI",
+          "chg_pct": -1.4,
+          "rvol": 0.88,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "GeneDx": [
+      {
+        "id": "dx-005",
+        "ticker": "WGS",
+        "company": "GeneDx",
+        "category": "Financial",
+        "materiality": 5,
+        "summary": "GeneDx preannounced Q2 revenue of $112-115M, well above its $102-106M guidance, on exome and genome volume strength.",
+        "title": "GeneDx Preannounces Q2 Revenue Above Guidance on Exome Volume Strength",
+        "url": "https://www.sec.gov/Archives/edgar/data/0001818331/000181833126000022/wgs-8k-prelim.htm",
+        "source": "EDGAR 8-K",
+        "ts": "2026-06-11T04:03:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": {
+          "ticker": "WGS",
+          "chg_pct": 3.9,
+          "rvol": 2.68,
+          "flagged": true
+        },
+        "is_driver": true
+      }
+    ],
+    "Biodesix": [
+      {
+        "id": "dx-017",
+        "ticker": "BDSX",
+        "company": "Biodesix",
+        "category": "Clinical",
+        "materiality": 3,
+        "summary": "Biodesix published a prospective CHEST study showing its Nodify strategy reclassified 42% of intermediate-risk lung nodules, cutting unnecessary procedures.",
+        "title": "Biodesix Publishes Validation Study for Nodify Lung Nodule Strategy",
+        "url": "https://www.genomeweb.com/lung/biodesix-nodify-validation-study",
+        "source": "GenomeWeb",
+        "ts": "2026-06-11T00:50:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "BDSX",
+          "chg_pct": -0.5,
+          "rvol": 0.55,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Castle Biosciences": [
+      {
+        "id": "dx-012",
+        "ticker": "CSTL",
+        "company": "Castle Biosciences",
+        "category": "Clinical",
+        "materiality": 3,
+        "summary": "Castle's DecisionDx-Melanoma data from a 10,000-patient registry was selected for an ASCO oral session, linking test-guided surveillance to earlier recurrence detection.",
+        "title": "Castle Biosciences DecisionDx-Melanoma Data Selected for ASCO Oral Session",
+        "url": "https://www.genomeweb.com/cancer/castle-decisiondx-asco-oral",
+        "source": "GenomeWeb",
+        "ts": "2026-06-11T01:25:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "CSTL",
+          "chg_pct": 0.9,
+          "rvol": 0.6,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "Myriad Genetics": [
+      {
+        "id": "dx-007",
+        "ticker": "MYGN",
+        "company": "Myriad Genetics",
+        "category": "Commercial",
+        "materiality": 4,
+        "summary": "Myriad will lose its UnitedHealthcare national contract for GeneSight on September 1, pressuring about $45M of annualized revenue.",
+        "title": "Myriad Genetics Loses UnitedHealthcare Contract for GeneSight",
+        "url": "https://www.fiercebiotech.com/diagnostics/myriad-genesight-unitedhealthcare-contract",
+        "source": "Fierce Diagnostics",
+        "ts": "2026-06-11T02:05:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "MYGN",
+          "chg_pct": -2.1,
+          "rvol": 0.76,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "BillionToOne": [
+      {
+        "id": "dx-013",
+        "ticker": "BLLN",
+        "company": "BillionToOne",
+        "category": "Commercial",
+        "materiality": 3,
+        "summary": "BillionToOne's UNITY Fetal Risk Screen gained Medicaid reimbursement in Ohio and Georgia, bringing covered states to 14.",
+        "title": "BillionToOne Expands UNITY Fetal Risk Screen Into Two New State Medicaid Programs",
+        "url": "https://www.prnewswire.com/billiontoone-unity-medicaid-expansion",
+        "source": "News Search",
+        "ts": "2026-06-11T04:38:49.926872Z",
+        "is_subject_relevant": false,
+        "price_reaction": {
+          "ticker": "BLLN",
+          "chg_pct": 1.1,
+          "rvol": 0.6,
+          "flagged": false
+        },
+        "is_driver": false
+      }
+    ],
+    "ArteraAI": [
+      {
+        "id": "dx-010",
+        "ticker": null,
+        "company": "ArteraAI",
+        "category": "Financial",
+        "materiality": 3,
+        "summary": "Private digital-pathology player ArteraAI raised a $90M Series C to expand beyond prostate into breast and bladder, now deployed at 60-plus sites.",
+        "title": "ArteraAI Raises $90M Series C to Expand Digital Pathology Platform",
+        "url": "https://www.fiercehealthcare.com/health-tech/arteraai-series-c-90m",
+        "source": "News Search",
+        "ts": "2026-06-11T03:50:49.926872Z",
+        "is_subject_relevant": true,
+        "price_reaction": null,
+        "is_driver": false
+      }
+    ]
+  },
+  "sector_headlines": [
+    {
+      "id": "dx-009",
+      "ticker": null,
+      "company": null,
+      "category": "Regulatory",
+      "materiality": 4,
+      "summary": "FDA finalized its phase-two LDT enforcement timeline, requiring registration, listing and adverse-event reporting for most lab tests within 12 months as legal challenges continue.",
+      "title": "FDA Finalizes Timeline for Phase Two of LDT Enforcement",
+      "url": "https://www.statnews.com/2026/06/fda-ldt-enforcement-phase-two",
+      "source": "STAT",
+      "ts": "2026-06-11T04:27:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": null,
+      "is_driver": false
+    },
+    {
+      "id": "dx-015",
+      "ticker": null,
+      "company": null,
+      "category": "Regulatory",
+      "materiality": 3,
+      "summary": "Commercial payers are widening prior-authorization requirements across genomic testing, lengthening cash-collection cycles sector-wide.",
+      "title": "Reimbursement Pressure Builds Across Genomic Testing as Payers Tighten Prior Auth",
+      "url": "https://www.statnews.com/2026/06/genomic-testing-reimbursement-pressure",
+      "source": "STAT",
+      "ts": "2026-06-11T00:05:49.926872Z",
+      "is_subject_relevant": true,
+      "price_reaction": null,
+      "is_driver": false
+    }
+  ],
+  "source_status": [
+    {
+      "provider": "rss",
+      "status": "ok",
+      "last_ts": "2026-06-11T04:27:49.926872Z",
+      "detail": null
+    },
+    {
+      "provider": "edgar",
+      "status": "stale",
+      "last_ts": "2026-06-11T04:03:49.926872Z",
+      "detail": "newest EDGAR pull is 82 min old — feed may be stale"
+    },
+    {
+      "provider": "news",
+      "status": "ok",
+      "last_ts": "2026-06-11T04:38:49.926872Z",
+      "detail": null
+    },
+    {
+      "provider": "quotes",
+      "status": "ok",
+      "last_ts": "2026-06-11T05:25:49.926872Z",
+      "detail": null
+    }
+  ],
+  "universe_label": "Diagnostics & Genomics",
+  "subject_ticker": "VCYT",
+  "subject_name": "Veracyte",
+  "categories": [
+    "Clinical",
+    "Commercial",
+    "Regulatory",
+    "Financial"
+  ],
+  "display_tz": "America/Los_Angeles",
+  "classifier_engine": "fixture"
+}

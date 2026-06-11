@@ -1,0 +1,29 @@
+id: diagnostics
+label: "Diagnostics & Genomics"
+subject: { ticker: VCYT, name: Veracyte }
+peers:
+  - { ticker: NTRA, name: Natera }
+  - { ticker: GH,   name: "Guardant Health" }
+  - { ticker: ADPT, name: "Adaptive Biotechnologies" }
+  - { ticker: TEM,  name: "Tempus AI" }
+  - { ticker: CAI,  name: "Caris Life Sciences" }
+  - { ticker: PSNL, name: Personalis }
+  - { ticker: WGS,  name: GeneDx }
+  - { ticker: BDSX, name: Biodesix }
+  - { ticker: CSTL, name: "Castle Biosciences" }
+  - { ticker: MYGN, name: "Myriad Genetics" }
+  - { ticker: BLLN, name: BillionToOne }
+private_watch: [ ArteraAI ]
+sector_keywords: [ diagnostics, genomics, "digital pathology", "liquid biopsy", MRD, reimbursement, LDT ]
+rss_feeds: [ GenomeWeb, "Precision Oncology News", STAT, BioCentury, "Fierce Diagnostics" ]
+categories: [ Clinical, Commercial, Regulatory, Financial ]
+house_style: |
+  Terse IR "First Read" voice. 1-2 sentences per item, factual, no hedging,
+  lead with the company and the event.
+thresholds:
+  sigma_multiple: 2.0     # flag if abs(%chg) >= sigma_multiple * sigma
+  rvol: 2.0               # flag if relative volume >= this
+  materiality_floor: 2    # drop items classified below this
+  hot_materiality: 4      # "hot" count + priority-signal bar
+  stale_after_min: 75     # source health: stale if last pull older than this
+delivery: { time: "07:00", tz: "America/Los_Angeles", recipients: [] }
