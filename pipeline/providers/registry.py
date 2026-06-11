@@ -1,6 +1,8 @@
 """Provider selection. Deterministic, env-driven — never decided by an LLM.
 
     BRIEF_PROVIDERS  fixture (default) | real     — global default for all sources
+                     (the production server, pipeline/serve.py, defaults
+                     itself to real so deploys never silently serve fixtures)
     BRIEF_RSS / BRIEF_EDGAR / BRIEF_NEWS / BRIEF_QUOTES / BRIEF_EMAIL
                      fixture | real               — per-provider override
     BRIEF_CLASSIFIER auto (default) | fixture | rules | anthropic

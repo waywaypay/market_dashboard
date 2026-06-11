@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import urllib.error
 import urllib.request
@@ -10,7 +11,32 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from pipeline.serve import ARTIFACT_PREFIXES, Handler, resolve_static, DIST, PUBLIC
+from pipeline.serve import (
+    ARTIFACT_PREFIXES,
+    DIST,
+    PUBLIC,
+    Handler,
+    _default_to_real_providers,
+    resolve_static,
+)
+
+
+def test_server_defaults_to_real_data_pulls(monkeypatch) -> None:
+    """A deploy with no BRIEF_* env (manually-created Render services never
+    see render.yaml) must pull real data, not silently serve fixtures."""
+    # setenv first so monkeypatch snapshots + restores the original state
+    monkeypatch.setenv("BRIEF_PROVIDERS", "placeholder")
+    monkeypatch.setenv("BRIEF_EMAIL", "placeholder")
+    monkeypatch.delenv("BRIEF_PROVIDERS")
+    monkeypatch.delenv("BRIEF_EMAIL")
+
+    _default_to_real_providers()
+    assert os.environ["BRIEF_PROVIDERS"] == "real"
+    assert os.environ["BRIEF_EMAIL"] == "fixture"  # no real transport yet
+
+    monkeypatch.setenv("BRIEF_PROVIDERS", "fixture")  # explicit demo mode wins
+    _default_to_real_providers()
+    assert os.environ["BRIEF_PROVIDERS"] == "fixture"
 
 
 def test_resolve_static_routes_artifacts_to_public() -> None:

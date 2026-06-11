@@ -198,7 +198,12 @@ the artifact is recomputed, not persisted, so free-tier spin-down just means
 a fresh brief on wake.
 
 Deploys pull real data out of the box — RSS, SEC EDGAR and Yahoo quotes need
-no keys. Two sources stay dark until you set secrets in the Render dashboard:
+no keys. This holds on **every** deploy path: `render.yaml` sets
+`BRIEF_PROVIDERS=real` for Blueprint deploys, and the server itself defaults
+to real providers when no `BRIEF_*` env is set, which covers manually-created
+services (where `render.yaml` is ignored). Set `BRIEF_PROVIDERS=fixture`
+explicitly for a synthetic demo deploy. Two sources stay dark until you set
+secrets in the Render dashboard:
 `EXA_API_KEY` (news search shows "failed" in the rail until then) and
 `ANTHROPIC_API_KEY` (classification falls back to rule-based tagging until
 then); also set `SEC_EDGAR_USER_AGENT` to your contact per SEC fair-access

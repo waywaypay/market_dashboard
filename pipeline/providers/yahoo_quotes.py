@@ -35,7 +35,10 @@ from pipeline.contracts import Quote
 from pipeline.providers.base import QuoteProvider
 from pipeline.providers.util import make_client
 
-CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+# query1 and query2 serve the same data from different edges; failing over
+# keeps one bad edge (or one blocked host) from sinking the whole pull.
+CHART_HOSTS = ("query1.finance.yahoo.com", "query2.finance.yahoo.com")
+CHART_URL = "https://{host}/v8/finance/chart/{symbol}"
 
 BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 
@@ -95,12 +98,19 @@ class YahooQuoteProvider(QuoteProvider):
         trailing_vol = volumes[-self.trailing_days :]
 
         meta = live.get("meta") or {}
-        last = _latest_trade(live)
-        prev_close = (
-            meta.get("chartPreviousClose")
-            or meta.get("previousClose")
-            or (closes[-1] if closes else None)
-        )
+        last = _latest_bar_close(live)
+        if last is not None:
+            prev_close = (
+                meta.get("chartPreviousClose")
+                or meta.get("previousClose")
+                or (closes[-1] if closes else None)
+            )
+        else:
+            # Nothing has traded yet today (thin name pre-open, or a bar
+            # outage): report the prior close, flat. Falling through to the
+            # usual prev_close would mislabel yesterday's move as today's.
+            last = meta.get("regularMarketPrice") or (closes[-1] if closes else None)
+            prev_close = last
         if last is None or not prev_close:
             raise ValueError("no traded price in chart response")
 
@@ -118,18 +128,29 @@ class YahooQuoteProvider(QuoteProvider):
 
     def _chart(self, symbol: str, params: dict[str, str]) -> dict:
         time.sleep(self.throttle_s)  # polite pacing — two requests per ticker
-        response = self._client.get(CHART_URL.format(symbol=symbol), params=params)
-        try:
-            chart = response.json().get("chart") or {}
-        except ValueError:
-            chart = {}
-        result = (chart.get("result") or [None])[0]
-        if response.status_code != 200 or result is None:
+        last_error: Exception | None = None
+        for host in CHART_HOSTS:
+            url = CHART_URL.format(host=host, symbol=symbol)
+            try:
+                response = self._client.get(url, params=params)
+            except httpx.HTTPError as exc:  # DNS/connect/timeout -> try the mirror
+                last_error = exc
+                continue
+            try:
+                chart = response.json().get("chart") or {}
+            except ValueError:
+                chart = {}
+            result = (chart.get("result") or [None])[0]
+            if response.status_code == 200 and result is not None:
+                return result
             error = (chart.get("error") or {}).get("description") or (
                 f"HTTP {response.status_code}"
             )
-            raise RuntimeError(f"Yahoo chart {symbol}: {error}")
-        return result
+            last_error = RuntimeError(f"Yahoo chart {symbol}: {error}")
+            if response.status_code == 404:
+                break  # unknown/delisted symbol — the mirror will agree
+        assert last_error is not None
+        raise last_error
 
 
 def _bars(result: dict) -> tuple[list[int], list, list]:
@@ -164,15 +185,14 @@ def _pct_moves(closes: list[float]) -> list[float]:
     return [(b - a) / a * 100.0 for a, b in zip(closes, closes[1:]) if a]
 
 
-def _latest_trade(result: dict) -> float | None:
+def _latest_bar_close(result: dict) -> float | None:
     """Last non-null intraday close (pre/post sessions included) = the most
-    recent trade; falls back to the meta's regular-market price."""
+    recent trade today; None when nothing has printed yet."""
     _, closes, _ = _bars(result)
     for value in reversed(closes):
         if value is not None:
             return float(value)
-    price = (result.get("meta") or {}).get("regularMarketPrice")
-    return float(price) if price is not None else None
+    return None
 
 
 def _bar_volume(result: dict) -> int:
