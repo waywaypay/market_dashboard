@@ -389,6 +389,39 @@ def test_yahoo_provider_raises_only_when_every_ticker_fails() -> None:
     assert _yahoo_provider().snapshot([]) == []
 
 
+def test_yahoo_provider_fails_over_to_mirror_host() -> None:
+    def flaky_edge(req: httpx.Request) -> httpx.Response:
+        if req.url.host == "query1.finance.yahoo.com":
+            return httpx.Response(502, text="bad edge")
+        assert req.url.host == "query2.finance.yahoo.com"
+        return yahoo_handler(req)
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(flaky_edge)
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 105.0  # query2 served what query1 couldn't
+
+
+def test_yahoo_provider_reports_flat_when_nothing_traded_today() -> None:
+    def quiet_open(req: httpx.Request) -> httpx.Response:
+        if dict(req.url.params).get("interval") == "1d":
+            return httpx.Response(200, json=_daily_payload("VCYT"))
+        payload = _live_payload("VCYT")
+        result = payload["chart"]["result"][0]
+        result["timestamp"] = []
+        result["indicators"]["quote"][0].update(close=[], volume=[])
+        return httpx.Response(200, json=payload)
+
+    provider = YahooQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(quiet_open)
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 104.5  # meta regularMarketPrice — the prior close
+    assert q.chg_pct == 0.0  # yesterday's move must not masquerade as today's
+    assert q.volume == 0
+
+
 def test_yahoo_provider_defaults_sigma_on_short_history() -> None:
     def thin_handler(req: httpx.Request) -> httpx.Response:
         if dict(req.url.params).get("interval") == "1d":
