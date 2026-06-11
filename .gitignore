@@ -7,7 +7,8 @@ __pycache__/
 
 # Node
 web/node_modules/
-web/dist/
+# NOTE: web/dist IS committed — deploys serve the dashboard instantly with no
+# build step. After changing web/src, run `make build` and commit the result.
 
 # Pipeline output (emails written by the FixtureEmailProvider)
 out/
