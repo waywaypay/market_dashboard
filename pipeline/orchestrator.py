@@ -68,6 +68,7 @@ def run_universe(
         engine=proc.engine,
         generated_at=now,
         market_open_at=next_market_open(now),
+        provider_modes=providers.modes,
     )
 
     written = write_artifacts(brief, web_public, default=default)
@@ -84,7 +85,7 @@ def run_universe(
     print(
         f"[{universe.id}] {brief.counts.total_items} items "
         f"({brief.counts.hot_items} hot), {sum(1 for q in brief.market if q.flagged)} flagged moves, "
-        f"engine={brief.classifier_engine} -> {written[0]}; {receipt_note}"
+        f"engine={brief.classifier_engine}, data={brief.data_mode} -> {written[0]}; {receipt_note}"
     )
     return brief
 

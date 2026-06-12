@@ -129,3 +129,10 @@ class DailyBrief(BaseModel):
     categories: list[str]  # ordered; UI maps index -> category color
     display_tz: str  # IANA tz for rendering timestamps (delivery.tz)
     classifier_engine: str  # "fixture" | "rules" | "anthropic" (provenance)
+
+    # -- data provenance: which providers actually produced this brief. The
+    #    dashboard banners anything that is not fully real, so synthetic demo
+    #    data can never pass for live market data. Defaults are the honest
+    #    direction: an artifact predating these fields reads as fixture. --
+    data_mode: Literal["real", "fixture", "mixed"] = "fixture"
+    provider_modes: dict[str, str] = Field(default_factory=dict)  # source -> fixture|real

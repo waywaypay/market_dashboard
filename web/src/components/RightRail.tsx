@@ -85,7 +85,8 @@ export function RightRail({
         </ul>
         <p className="mt-3 border-t border-hairline pt-2 text-[10px] leading-relaxed text-faint">
           Generated {fmtClock(brief.generated_at, brief.display_tz)} ·
-          classifier: <span className="num">{brief.classifier_engine}</span>
+          classifier: <span className="num">{brief.classifier_engine}</span> ·
+          data: <span className="num">{brief.data_mode}</span>
         </p>
       </RailCard>
     </aside>

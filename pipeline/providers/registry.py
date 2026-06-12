@@ -57,6 +57,9 @@ class ProviderSet:
     quotes: QuoteProvider
     classifier: ClassifierProvider
     email: EmailProvider
+    # source -> "fixture"|"real", recorded at build time so the brief can
+    # carry its own provenance (DailyBrief.data_mode / provider_modes)
+    modes: dict[str, str]
 
 
 def _anthropic_available() -> bool:
@@ -134,4 +137,5 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
         quotes=_pick("QUOTES", lambda: FixtureQuoteProvider(uid, now), real_quotes),
         classifier=build_classifier(uid),
         email=_pick("EMAIL", lambda: FixtureEmailProvider(), real_email),
+        modes={name.lower(): _mode(name) for name in ("RSS", "EDGAR", "NEWS", "QUOTES", "EMAIL")},
     )

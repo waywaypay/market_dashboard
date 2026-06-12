@@ -20,3 +20,15 @@ out/
 
 # TypeScript incremental build state
 *.tsbuildinfo
+
+# Pipeline artifacts — generated per run, NEVER committed. A committed
+# fixture artifact is indistinguishable from live data on a deploy: any
+# host whose boot refresh fails would serve synthetic stories as if they
+# were this morning's market. The server answers 503 + refresh status
+# until the first real run lands instead.
+web/public/brief.json
+web/public/briefs/
+web/public/universes.json
+web/dist/brief.json
+web/dist/briefs/
+web/dist/universes.json
