@@ -19,23 +19,30 @@ from pipeline.providers.edgar import SecEdgarProvider
 from pipeline.providers.exa_news import ExaNewsProvider
 from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.util import infer_ticker, strip_tags
+from pipeline.providers import stooq_quotes
+from pipeline.providers.fallback import FallbackQuoteProvider
+from pipeline.providers.stooq_quotes import StooqQuoteProvider
 from pipeline.providers.yahoo_quotes import (
     _HISTORY_CACHE,
     _SESSION,
     DEFAULT_SIGMA,
     YahooQuoteProvider,
 )
+from pipeline.contracts import Quote
+from pipeline.providers.base import QuoteProvider
 from pipeline.contracts.universe import RSSFeed
 
 
 @pytest.fixture(autouse=True)
-def _fresh_yahoo_state():
-    """Both module-level caches must not leak between tests."""
+def _fresh_quote_provider_state():
+    """Module-level caches must not leak between tests."""
     _HISTORY_CACHE.clear()
     _SESSION.update(crumb=None, cookies=None)
+    stooq_quotes._HISTORY_CACHE.clear()
     yield
     _HISTORY_CACHE.clear()
     _SESSION.update(crumb=None, cookies=None)
+    stooq_quotes._HISTORY_CACHE.clear()
 
 NOW = datetime.now(timezone.utc)
 COMPANIES = {"VCYT": "Veracyte", "NTRA": "Natera", "GH": "Guardant Health"}
@@ -651,3 +658,106 @@ def test_yahoo_provider_does_the_crumb_handshake_once_per_process() -> None:
         (q,) = provider.snapshot(["VCYT"])
         assert q.last == 105.0
     assert crumb_calls["n"] == 1  # cookie+crumb reused across instances
+
+
+# ------------------------------------------------------- Stooq (keyless fallback)
+
+
+def _stooq_quote_csv() -> str:
+    from zoneinfo import ZoneInfo
+
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    stale = today - timedelta(days=1)
+    return (
+        "Symbol,Date,Time,Open,High,Low,Close,Volume\n"
+        f"VCYT.US,{today},15:45:12,110.0,112.0,109.5,111.3,412000\n"
+        f"NTRA.US,{stale},22:00:00,167.0,169.0,166.5,168.42,3100000\n"
+        "GH.US,N/D,N/D,N/D,N/D,N/D,N/D,N/D\n"
+    )
+
+
+# dates are decorative — the provider reads Close/Volume sequentially
+STOOQ_HISTORY_CSV = "Date,Open,High,Low,Close,Volume\n" + "\n".join(
+    f"2026-03-{i + 1:02d},0,0,0,{c},1000000" for i, c in enumerate(DAILY_CLOSES)
+)
+
+
+def stooq_handler(req: httpx.Request) -> httpx.Response:
+    params = dict(req.url.params)
+    if req.url.path == "/q/l/":
+        assert "vcyt.us" in params["s"]  # all symbols batched into one request
+        assert params["e"] == "csv"
+        return httpx.Response(200, text=_stooq_quote_csv())
+    assert req.url.path == "/q/d/l/"
+    assert params["i"] == "d" and "d1" in params and "d2" in params
+    return httpx.Response(200, text=STOOQ_HISTORY_CSV)
+
+
+def test_stooq_provider_prices_batch_with_history_stats() -> None:
+    provider = StooqQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(stooq_handler)
+    )
+    by = {q.ticker: q for q in provider.snapshot(["VCYT", "NTRA", "GH"])}
+
+    assert set(by) == {"VCYT", "NTRA"}  # the N/D row is skipped, not fatal
+    v = by["VCYT"]
+    assert v.name == "Veracyte" and v.last == 111.3
+    assert v.chg_pct == 5.0  # vs the last completed close (106.0) from history
+    assert v.volume == 412000 and v.avg_volume == 1_000_000
+    moves = [(b - a) / a * 100.0 for a, b in zip(DAILY_CLOSES, DAILY_CLOSES[1:])]
+    assert v.sigma == pytest.approx(statistics.stdev(moves[-20:]), abs=0.01)
+    # stale print = no session today yet -> flat, never yesterday's move
+    n = by["NTRA"]
+    assert n.last == 168.42 and n.chg_pct == 0.0 and n.volume == 0
+
+
+def test_stooq_provider_survives_history_outage() -> None:
+    def no_history(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/q/l/":
+            return httpx.Response(200, text=_stooq_quote_csv())
+        return httpx.Response(500, text="history down")
+
+    provider = StooqQuoteProvider(
+        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(no_history)
+    )
+    (q,) = [x for x in provider.snapshot(["VCYT"]) if x.ticker == "VCYT"]
+    assert q.last == 111.3  # the price still ships
+    assert q.chg_pct == 0.0  # no prior close known -> flat, not fabricated
+    assert q.sigma == stooq_quotes.DEFAULT_SIGMA and q.avg_volume == 0
+
+
+def test_stooq_provider_raises_when_nothing_usable() -> None:
+    empty = "Symbol,Date,Time,Open,High,Low,Close,Volume\n"
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, text=empty)),
+    )
+    with pytest.raises(RuntimeError, match="no usable rows"):
+        provider.snapshot(["VCYT"])
+
+
+# ------------------------------------------------------------- quote vendor chain
+
+
+class _BoomQuotes(QuoteProvider):
+    def snapshot(self, tickers: list[str]) -> list[Quote]:
+        raise RuntimeError("primary down")
+
+
+class _CannedQuotes(QuoteProvider):
+    def snapshot(self, tickers: list[str]) -> list[Quote]:
+        return [
+            Quote(ticker=t, name=t, last=1.0, chg_pct=0.0, volume=1, avg_volume=1, sigma=3.0)
+            for t in tickers
+        ]
+
+
+def test_fallback_chain_uses_backup_when_primary_fails() -> None:
+    quotes = FallbackQuoteProvider(_BoomQuotes(), _CannedQuotes()).snapshot(["VCYT"])
+    assert [q.ticker for q in quotes] == ["VCYT"]
+
+
+def test_fallback_chain_reports_every_vendors_failure() -> None:
+    with pytest.raises(RuntimeError, match="all quote vendors failed.*primary down"):
+        FallbackQuoteProvider(_BoomQuotes(), _BoomQuotes()).snapshot(["VCYT"])
