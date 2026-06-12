@@ -74,6 +74,10 @@ export const dailyBriefSchema = z.object({
   categories: z.array(z.string()),
   display_tz: z.string(),
   classifier_engine: z.string(),
+  // provenance: artifacts predating these fields read as fixture — the
+  // banner must never give synthetic data the benefit of the doubt
+  data_mode: z.enum(["real", "fixture", "mixed"]).default("fixture"),
+  provider_modes: z.record(z.string(), z.string()).default({}),
 });
 
 export const universeEntrySchema = z.object({

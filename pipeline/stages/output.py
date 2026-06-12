@@ -12,6 +12,21 @@ from pathlib import Path
 
 from pipeline.contracts import Counts, DailyBrief, Item, Quote, SourceHealth, UniverseConfig
 
+# Providers whose mode determines whether the DATA in the brief is real.
+# Email transport is delivery, not data, so it never taints data_mode.
+DATA_SOURCES = ("rss", "edgar", "news", "quotes")
+
+
+def derive_data_mode(provider_modes: dict[str, str]) -> str:
+    """real | fixture | mixed, from the modes the registry actually selected.
+    Unknown/missing sources count as fixture — provenance must never overclaim."""
+    seen = {provider_modes.get(source, "fixture") for source in DATA_SOURCES}
+    if seen == {"real"}:
+        return "real"
+    if seen == {"fixture"}:
+        return "fixture"
+    return "mixed"
+
 
 def _ordered_companies(universe: UniverseConfig, items: list[Item]) -> list[str]:
     """Display order: subject first, then peers (config order), then private
@@ -32,6 +47,7 @@ def assemble_brief(
     engine: str,
     generated_at: datetime,
     market_open_at: datetime,
+    provider_modes: dict[str, str] | None = None,
 ) -> DailyBrief:
     hot = universe.thresholds.hot_materiality
 
@@ -68,6 +84,8 @@ def assemble_brief(
         categories=universe.categories,
         display_tz=universe.delivery.tz,
         classifier_engine=engine,
+        data_mode=derive_data_mode(provider_modes or {}),  # type: ignore[arg-type]
+        provider_modes=provider_modes or {},
     )
 
 

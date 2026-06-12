@@ -14,7 +14,18 @@ import { z } from "zod";
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  if (!res.ok) {
+    // serve.py answers a missing artifact with 503 + the refresh status
+    // (running/failed + why) — surface that instead of a bare status code
+    let detail = "";
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* non-JSON error body — fall through to the generic message */
+    }
+    throw new Error(detail || `${url}: HTTP ${res.status}`);
+  }
   return res.json();
 }
 

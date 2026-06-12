@@ -99,6 +99,20 @@ def render_email(brief: DailyBrief) -> str:
     )
     sector_rows = "".join(_item_row(i, brief) for i in brief.sector_headlines)
 
+    # Synthetic data must announce itself in the email exactly like it does
+    # on the dashboard — a forwarded First Read has no Sources panel.
+    if brief.data_mode == "real":
+        provenance_banner = ""
+    else:
+        label = (
+            "SYNTHETIC DEMO DATA" if brief.data_mode == "fixture" else "PARTIALLY SYNTHETIC DATA"
+        )
+        provenance_banner = (
+            f'<tr><td style="background:#FEF3F2;border-bottom:2px solid {DOWN};padding:10px 24px;">'
+            f'<span style="font-family:{_BODY};font-size:12px;font-weight:bold;color:{DOWN};">'
+            f"&#9888;&#xFE0E; {label} — fixture providers, not live market data.</span></td></tr>"
+        )
+
     movers = [q for q in brief.market if q.flagged]
     movers_line = " &nbsp;·&nbsp; ".join(
         f'<span style="font-family:{_MONO};color:{UP if q.chg_pct >= 0 else DOWN};">'
@@ -124,6 +138,7 @@ def render_email(brief: DailyBrief) -> str:
       {escape(brief.tldr)}</div>
     {f'<div style="margin-top:10px;font-size:13px;">{movers_line}</div>' if movers_line else ""}
   </td></tr>
+  {provenance_banner}
   {_section(f"{brief.subject_name} ({brief.subject_ticker})", subject_items)
     or _section(brief.subject_name, f'<tr><td style="padding:12px 0;font-family:{_BODY};font-size:13px;color:#667085;">Nothing material on {escape(brief.subject_name)} overnight.</td></tr>')}
   {_section("Comps", comp_rows)}
@@ -131,7 +146,7 @@ def render_email(brief: DailyBrief) -> str:
   <tr><td style="padding:20px 24px;background:{SURFACE};border-top:1px solid {HAIRLINE};">
     <div style="font-family:{_BODY};font-size:11px;color:#98A2B3;line-height:17px;">
       Generated {_fmt_time(brief.generated_at, brief.display_tz)} · market opens
-      {_fmt_time(brief.market_open_at, brief.display_tz)} · classifier: {escape(brief.classifier_engine)}.<br>
+      {_fmt_time(brief.market_open_at, brief.display_tz)} · classifier: {escape(brief.classifier_engine)} · data: {escape(brief.data_mode)}.<br>
       Rendered from the same artifact as the dashboard — they never disagree.</div>
   </td></tr>
 </table>
