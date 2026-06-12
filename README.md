@@ -76,7 +76,7 @@ Every external dependency sits behind a typed interface in
 | `RSSProvider`        | synthetic feed items               | **`HttpRSSProvider` (working)** — feed URLs in the YAML   |
 | `EdgarProvider`      | synthetic 8-Ks                     | **`SecEdgarProvider` (working)** — free SEC submissions API|
 | `NewsProvider`       | synthetic search results           | **`ExaNewsProvider` (working)** — Exa semantic news search|
-| `QuoteProvider`      | seeded pre-market snapshot         | **`YahooQuoteProvider` (working)** — keyless Yahoo charts |
+| `QuoteProvider`      | seeded pre-market snapshot         | **Yahoo → Stooq chain (working)** — keyless, self-healing |
 | `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)                   |
 | `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                         |
 
@@ -109,19 +109,21 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   `category: news` and a published-date window (`EXA_LOOKBACK_HOURS`, default
   36; `EXA_NUM_RESULTS` per query, default 10). Undated results are dropped —
   they can't pass the no-look-ahead gate.
-* **Quotes (Yahoo)** — no key needed. Primary path: ONE batched v7 quote
-  call per refresh prices the whole universe (pre/post-market price,
-  previous close, day volume, 3-month average volume), behind a
-  cookie+crumb handshake done once per process. `sigma` (stdev of the last
-  `QUOTES_TRAILING_DAYS` daily % moves, default 20) comes from per-ticker
-  daily history, cached per UTC day and best-effort — a throttled history
-  call degrades to a conservative default instead of dropping the ticker.
-  If the handshake fails, a per-ticker chart fallback rebuilds the same
-  quote. RVOL and unusual-move flags stay derived in the fuse stage.
-  Yahoo rate-limits shared cloud IPs, so requests are paced and 429s get a
-  capped exponential backoff honoring `Retry-After`. If it still
-  misbehaves, mix back with `BRIEF_QUOTES=fixture` while you pick a paid
-  vendor.
+* **Quotes (Yahoo → Stooq chain)** — no keys needed. Yahoo is primary: ONE
+  batched v7 quote call per refresh prices the whole universe (pre/post-
+  market price, previous close, day volume, 3-month average volume) behind
+  a cookie+crumb handshake done once per process; `sigma` (stdev of the
+  last `QUOTES_TRAILING_DAYS` daily % moves, default 20) comes from
+  per-ticker daily history, cached per UTC day and best-effort. A
+  per-ticker chart fallback covers handshake failures. When Yahoo
+  rate-limits the host's shared egress IP entirely (HTTP 429 — common on
+  free cloud tiers), the chain falls back to **Stooq**: real exchange data
+  over keyless CSV — batched delayed quotes plus daily history for
+  sigma/avg_volume — with no pre-market tape, so pre-open it reports the
+  prior close flat. The next refresh retries Yahoo first, so pre-market
+  quality restores itself. Requests are paced with capped, `Retry-After`-
+  honoring backoff and a hard time budget (`QUOTES_DEADLINE_S`, default
+  120s). RVOL and unusual-move flags stay derived in the fuse stage.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 

@@ -111,9 +111,16 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
         return ExaNewsProvider(companies=universe.companies, watch=universe.private_watch)
 
     def real_quotes() -> QuoteProvider:
+        from pipeline.providers.fallback import FallbackQuoteProvider
+        from pipeline.providers.stooq_quotes import StooqQuoteProvider
         from pipeline.providers.yahoo_quotes import YahooQuoteProvider
 
-        return YahooQuoteProvider(companies=universe.companies)
+        # Yahoo first (pre-market tape); Stooq is the keyless real-data
+        # fallback for when Yahoo rate-limits the host's shared egress IP.
+        return FallbackQuoteProvider(
+            YahooQuoteProvider(companies=universe.companies),
+            StooqQuoteProvider(companies=universe.companies),
+        )
 
     def real_email() -> EmailProvider:
         from pipeline.providers.real_stubs import SmtpEmailProvider
