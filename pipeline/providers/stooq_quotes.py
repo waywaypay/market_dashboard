@@ -29,8 +29,13 @@ from pipeline.contracts import Quote
 from pipeline.providers.base import QuoteProvider
 from pipeline.providers.util import make_client
 
-QUOTE_URL = "https://stooq.com/q/l/"
-HISTORY_URL = "https://stooq.com/q/d/l/"
+# stooq.pl is the origin; stooq.com the international mirror. They serve the
+# same keyless CSV endpoints, and a shared cloud egress IP that one edge has
+# 404'd/limited the other sometimes still answers — so we fail over between
+# them exactly like the Yahoo provider does across its query1/query2 edges.
+HOSTS = ("stooq.com", "stooq.pl")
+QUOTE_PATH = "/q/l/"
+HISTORY_PATH = "/q/d/l/"
 
 DEFAULT_SIGMA = 3.0  # conservative stand-in when history is unavailable/too short
 MIN_RETURNS = 5
@@ -52,6 +57,8 @@ class StooqQuoteProvider(QuoteProvider):
         companies: dict[str, str] | None = None,
         trailing_days: int | None = None,
         throttle_s: float = 0.2,
+        max_attempts: int = 2,
+        backoff_s: float = 1.0,
         transport: httpx.BaseTransport | None = None,
     ):
         self.companies = companies or {}  # ticker -> display name
@@ -61,6 +68,8 @@ class StooqQuoteProvider(QuoteProvider):
             else os.environ.get("QUOTES_TRAILING_DAYS", "20")
         )
         self.throttle_s = throttle_s
+        self.max_attempts = max_attempts
+        self.backoff_s = backoff_s
         self._client = make_client(transport=transport, timeout=10.0)
 
     # -- public interface ---------------------------------------------------
@@ -122,7 +131,7 @@ class StooqQuoteProvider(QuoteProvider):
 
     def _quote_rows(self, tickers: list[str]) -> dict[str, dict]:
         response = self._get(
-            QUOTE_URL,
+            QUOTE_PATH,
             {"s": "+".join(_symbol(t) for t in tickers), "f": "sd2t2ohlcv", "h": "", "e": "csv"},
         )
         rows: dict[str, dict] = {}
@@ -150,7 +159,7 @@ class StooqQuoteProvider(QuoteProvider):
         if cached is not None and cached[0] == today:
             return cached[1], cached[2]
         response = self._get(
-            HISTORY_URL,
+            HISTORY_PATH,
             {
                 "s": _symbol(ticker),
                 "i": "d",
@@ -171,12 +180,31 @@ class StooqQuoteProvider(QuoteProvider):
             _HISTORY_CACHE[ticker] = (today, closes, volumes)
         return closes, volumes
 
-    def _get(self, url: str, params: dict[str, str]) -> httpx.Response:
-        time.sleep(self.throttle_s)
-        response = self._client.get(url, params=params)
-        if response.status_code != 200:
-            raise RuntimeError(f"Stooq returned HTTP {response.status_code}")
-        return response
+    def _get(self, path: str, params: dict[str, str]) -> httpx.Response:
+        """GET a Stooq CSV endpoint, failing over across mirror hosts and
+        retrying with capped backoff. A single bad edge (404/limit/5xx) or a
+        transient transport error must not sink the whole fallback tier."""
+        last_response: httpx.Response | None = None
+        last_error: Exception | None = None
+        wait = self.backoff_s
+        for attempt in range(self.max_attempts):
+            if attempt:
+                time.sleep(wait)
+                wait *= 2
+            for host in HOSTS:
+                time.sleep(self.throttle_s)  # polite pacing — Stooq is generous but not infinite
+                try:
+                    response = self._client.get(f"https://{host}{path}", params=params)
+                except httpx.HTTPError as exc:  # DNS/connect/timeout -> try the mirror
+                    last_error = exc
+                    continue
+                if response.status_code == 200:
+                    return response
+                last_response = response  # 404/limit/5xx: the mirror or a retry may answer
+        if last_response is not None:
+            raise RuntimeError(f"Stooq returned HTTP {last_response.status_code}")
+        assert last_error is not None
+        raise last_error
 
 
 def _num(value: str | None) -> float | None:

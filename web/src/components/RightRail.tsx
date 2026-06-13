@@ -121,16 +121,20 @@ function SourceRow({
   const label = PROVIDER_LABELS[provider] ?? provider;
 
   // Empty/failed states speak in the product's voice, not a generic spinner.
+  // When the pipeline supplies a `detail` (e.g. "quiet between sessions"), it
+  // wins; otherwise the rail synthesizes the live phrasing from the timestamp.
   let line: string;
-  if (status === "ok" && last_ts) {
-    line = `last pull ${fmtClock(last_ts, brief.display_tz)}`;
-  } else if (status === "stale" && last_ts) {
-    line = `No ${label} pulls since ${fmtClock(last_ts, brief.display_tz)} (${minutesAgo(
-      last_ts,
-      nowMs,
-    )}m) — feed may be stale`;
+  if (status === "ok") {
+    line = last_ts ? `last pull ${fmtClock(last_ts, brief.display_tz)}` : detail || "up to date";
   } else if (status === "stale") {
-    line = `No ${label} pulls this run — feed may be stale`;
+    line =
+      detail ||
+      (last_ts
+        ? `No ${label} pulls since ${fmtClock(last_ts, brief.display_tz)} (${minutesAgo(
+            last_ts,
+            nowMs,
+          )}m) — feed may be stale`
+        : `No ${label} pulls this run — feed may be stale`);
   } else {
     line = detail ? `${label} failed: ${detail}` : `${label} failed this run`;
   }

@@ -711,6 +711,27 @@ def test_stooq_provider_prices_batch_with_history_stats() -> None:
     assert n.last == 168.42 and n.chg_pct == 0.0 and n.volume == 0
 
 
+def test_stooq_provider_fails_over_to_mirror_host() -> None:
+    seen: list[str] = []
+
+    def flaky_edge(req: httpx.Request) -> httpx.Response:
+        seen.append(req.url.host)
+        if req.url.host == "stooq.com":
+            return httpx.Response(404, text="not here")
+        assert req.url.host == "stooq.pl"  # the mirror picks up what .com 404'd
+        return stooq_handler(req)
+
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        transport=httpx.MockTransport(flaky_edge),
+    )
+    by = {q.ticker: q for q in provider.snapshot(["VCYT"])}
+    assert by["VCYT"].last == 111.3  # served by stooq.pl
+    assert "stooq.pl" in seen
+
+
 def test_stooq_provider_survives_history_outage() -> None:
     def no_history(req: httpx.Request) -> httpx.Response:
         if req.url.path == "/q/l/":
