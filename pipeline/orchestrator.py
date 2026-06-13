@@ -15,34 +15,18 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from pipeline.contracts import DailyBrief, UniverseConfig
 from pipeline.contracts.universe import discover_universes, load_universe
 from pipeline.email_render import email_subject, render_email
+from pipeline.market_hours import next_market_open
 from pipeline.providers.registry import ProviderSet, build_providers
 from pipeline.stages.fuse import run_fuse
 from pipeline.stages.output import assemble_brief, write_artifacts
 from pipeline.stages.process import run_process
 from pipeline.stages.source import run_source
-
-MARKET_TZ = ZoneInfo("America/New_York")
-MARKET_OPEN = time(9, 30)
-
-
-def next_market_open(now: datetime) -> datetime:
-    """Next 9:30am US/Eastern at-or-after `now`, skipping weekends."""
-    local = now.astimezone(MARKET_TZ)
-    candidate = local.replace(
-        hour=MARKET_OPEN.hour, minute=MARKET_OPEN.minute, second=0, microsecond=0
-    )
-    while candidate < local or candidate.weekday() >= 5:
-        candidate = (candidate + timedelta(days=1)).replace(
-            hour=MARKET_OPEN.hour, minute=MARKET_OPEN.minute
-        )
-    return candidate
 
 
 def run_universe(

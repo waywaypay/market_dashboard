@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel
 
 from pipeline.contracts import Quote, RawItem, SourceHealth, UniverseConfig
+from pipeline.market_hours import is_quiet_period
 from pipeline.providers.registry import ProviderSet
 
 _SOURCE_RANK = {"edgar": 0, "rss": 1, "news": 2}  # keep the most primary copy
@@ -65,6 +66,7 @@ def _health(
     error: Exception | None,
     now: datetime,
     stale_after: timedelta,
+    quiet: bool,
 ) -> SourceHealth:
     if error is not None:
         return SourceHealth(
@@ -74,23 +76,30 @@ def _health(
             detail=f"{type(error).__name__}: {error}",
         )
     last_ts = max((i.ts for i in items), default=None)
-    if last_ts is None or now - last_ts > stale_after:
-        if last_ts is None:
-            detail = f"no {provider.upper()} items pulled this run — feed may be down"
-        else:
-            mins = int((now - last_ts).total_seconds() // 60)
-            detail = f"newest {provider.upper()} pull is {mins} min old — feed may be stale"
-        return SourceHealth(
-            provider=provider,  # type: ignore[arg-type]
-            status="stale",
-            last_ts=last_ts,
-            detail=detail,
+    overdue = last_ts is None or now - last_ts > stale_after
+    if overdue and quiet:
+        # Between sessions a slow feed is expected, not a fault — report it
+        # healthy. detail is left for the UI to synthesize ("last pull <t>")
+        # except the empty case, which has no timestamp to render.
+        detail = (
+            None
+            if last_ts is not None
+            else f"No new {provider.upper()} items — quiet between sessions"
         )
+        return SourceHealth(provider=provider, status="ok", last_ts=last_ts, detail=detail)  # type: ignore[arg-type]
+    if overdue:
+        # Inside the pre-market/session window a quiet feed IS the alarm. detail
+        # stays None so the dashboard renders its live "N min old" phrasing.
+        return SourceHealth(provider=provider, status="stale", last_ts=last_ts, detail=None)  # type: ignore[arg-type]
     return SourceHealth(provider=provider, status="ok", last_ts=last_ts, detail=None)  # type: ignore[arg-type]
 
 
 def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) -> SourceResult:
     stale_after = timedelta(minutes=universe.thresholds.stale_after_min)
+    # Between sessions (weekends/overnight) a quiet tape is expected, so health
+    # softens its alarms; the strict pre-market checks apply only when fresh
+    # data is actually due.
+    quiet = is_quiet_period(now)
     calls = {
         "rss": lambda: providers.rss.fetch(universe.rss_feeds),
         "edgar": lambda: providers.edgar.fetch(universe.tickers),
@@ -128,25 +137,39 @@ def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) 
     ]
 
     health = [
-        _health(name, [i for i in raw[name] if i.ts <= now], errors[name], now, stale_after)
+        _health(name, [i for i in raw[name] if i.ts <= now], errors[name], now, stale_after, quiet)
         for name in ("rss", "edgar", "news")
     ]
-    if quote_error is not None:
-        health.append(
-            SourceHealth(
-                provider="quotes",
-                status="failed",
-                last_ts=None,
-                detail=f"{type(quote_error).__name__}: {quote_error}",
-            )
-        )
-    else:
-        health.append(
-            SourceHealth(
-                provider="quotes",
-                status="ok" if quotes else "stale",
-                last_ts=now if quotes else None,
-                detail=None if quotes else "snapshot returned no tickers",
-            )
-        )
+    health.append(_quote_health(quotes, quote_error, now, quiet))
     return SourceResult(items=items, quotes=quotes, health=health)
+
+
+def _quote_health(
+    quotes: list[Quote], error: Exception | None, now: datetime, quiet: bool
+) -> SourceHealth:
+    """Quote health in the product's voice. The raw vendor chain error already
+    went to the logs; the rail gets a clean line. Between sessions there is no
+    pre-market tape to expect, so an outage is a soft amber, not a red ✕."""
+    if error is not None:
+        if quiet:
+            return SourceHealth(
+                provider="quotes",
+                status="stale",
+                last_ts=None,
+                detail="No live quotes between sessions — vendors unreachable; "
+                "resumes when the market reopens.",
+            )
+        return SourceHealth(
+            provider="quotes",
+            status="failed",
+            last_ts=None,
+            detail="All quote vendors failed this run — live market data is "
+            "temporarily unavailable (it resumes automatically).",
+        )
+    if quotes:
+        return SourceHealth(provider="quotes", status="ok", last_ts=now, detail=None)
+    if quiet:
+        return SourceHealth(
+            provider="quotes", status="ok", last_ts=None, detail="No quotes — quiet between sessions"
+        )
+    return SourceHealth(provider="quotes", status="stale", last_ts=None, detail=None)
