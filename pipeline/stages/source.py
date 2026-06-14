@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from pipeline.contracts import Quote, RawItem, SourceHealth, UniverseConfig
 from pipeline.market_hours import is_quiet_period
 from pipeline.providers.registry import ProviderSet
+from pipeline.providers.util import is_probably_english
 
 _SOURCE_RANK = {"edgar": 0, "rss": 1, "news": 2}  # keep the most primary copy
 
@@ -42,6 +43,15 @@ def _is_dupe(a: RawItem, b: RawItem) -> bool:
     if _norm_url(a.url) == _norm_url(b.url):
         return True
     return SequenceMatcher(None, _norm_title(a.title), _norm_title(b.title)).ratio() >= 0.90
+
+
+def drop_non_english(items: list[RawItem]) -> list[RawItem]:
+    """Keep only items whose headline reads as English. Real RSS feeds and the
+    Exa news search routinely return foreign-language stories; the brief (and
+    the rule-based summary, which echoes raw text verbatim) is English-only, so
+    we filter here — the one chokepoint feeding every downstream stage. The
+    gate is conservative: it drops the clearly-foreign and keeps the unsure."""
+    return [i for i in items if is_probably_english(i.title, i.raw_text)]
 
 
 def dedupe(items: list[RawItem]) -> list[RawItem]:
@@ -128,7 +138,10 @@ def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) 
     # (= generated_at). Enforced here so it holds for every downstream stage.
     fresh = [i for items in raw.values() for i in items if i.ts <= now]
 
-    items = dedupe(fresh)
+    # Drop non-English headlines before dedupe/brief. Health (below) is measured
+    # on the look-ahead set, not this one, so a foreign-heavy feed still reports
+    # its true connectivity rather than reading as stale.
+    items = dedupe(drop_non_english(fresh))
     quotes = [
         q.model_copy(
             update={"rvol": round(q.volume / q.avg_volume, 2) if q.avg_volume else None}

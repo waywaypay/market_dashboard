@@ -20,7 +20,7 @@ import httpx
 from pipeline.contracts import RawItem
 from pipeline.contracts.universe import RSSFeed
 from pipeline.providers.base import RSSProvider
-from pipeline.providers.util import infer_ticker, make_client, strip_tags
+from pipeline.providers.util import clean_title, infer_ticker, make_client, strip_tags
 
 
 class HttpRSSProvider(RSSProvider):
@@ -66,7 +66,7 @@ class HttpRSSProvider(RSSProvider):
         out: list[RawItem] = []
         for entry in parsed.entries[: self.max_per_feed * 2]:
             link = entry.get("link")
-            title = (entry.get("title") or "").strip()
+            title = clean_title(entry.get("title") or "", feed.label)
             if not link or not title:
                 continue
             ts = _entry_ts(entry)

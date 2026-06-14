@@ -21,7 +21,7 @@ import httpx
 
 from pipeline.contracts import RawItem
 from pipeline.providers.base import NewsProvider
-from pipeline.providers.util import infer_ticker, make_client
+from pipeline.providers.util import clean_title, infer_ticker, make_client, strip_tags
 
 EXA_SEARCH_URL = "https://api.exa.ai/search"
 
@@ -94,11 +94,11 @@ class ExaNewsProvider(NewsProvider):
         out: list[RawItem] = []
         for result in response.json().get("results", []):
             url = result.get("url")
-            title = (result.get("title") or "").strip()
+            title = clean_title(result.get("title") or "", _domain(url) if url else None)
             ts = _parse_published(result.get("publishedDate"))
             if not url or not title or ts is None:
                 continue  # undated results can't pass the no-look-ahead bar
-            text = (result.get("text") or "").strip() or title
+            text = strip_tags(result.get("text") or "", 1200) or title
             out.append(
                 RawItem(
                     id="exa-" + hashlib.sha1(url.encode()).hexdigest()[:12],
