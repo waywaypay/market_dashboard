@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { DailyBrief, Quote } from "../lib/contracts";
 import { fmtPct, fmtPrice, fmtRvol } from "../lib/format";
 import { SectionHead } from "./bits";
+import { MoveBars } from "./MoveBars";
 
 type SortKey = "config" | "chg" | "rvol" | "ticker";
 
@@ -95,6 +96,15 @@ export function MarketStrip({
             />
           ))}
         </ul>
+      )}
+      {quotes.length > 0 && (
+        <MoveBars
+          brief={brief}
+          hoverTicker={hoverTicker}
+          hoverItemId={hoverItemId}
+          onHover={onHover}
+          onVisualize={onVisualize}
+        />
       )}
     </section>
   );
