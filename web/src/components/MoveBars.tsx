@@ -1,5 +1,5 @@
-/** Horizontal bar chart of each peer's pre-market move, ordered by the size of
- * the move — biggest movers on top, smallest at the bottom. Diverging from a
+/** Horizontal bar chart of each peer's pre-market move, ordered from the
+ * largest gain at the top to the largest loss at the bottom. Diverging from a
  * center zero line: gains run right (green), losses run left (red), so direction
  * and magnitude read at once. A companion to the tiles above that answers
  * "who's moving, and how much" in a single glance. Plain divs sized by percent,
@@ -22,9 +22,9 @@ export function MoveBars({
   hoverItemId: string | null;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
 }) {
-  // largest move to smallest, by magnitude — direction is carried by the bar
+  // largest positive move at the top, descending to the largest negative move
   const rows = useMemo(
-    () => [...brief.market].sort((a, b) => Math.abs(b.chg_pct) - Math.abs(a.chg_pct)),
+    () => [...brief.market].sort((a, b) => b.chg_pct - a.chg_pct),
     [brief.market],
   );
   // scale every bar to the biggest absolute move; floor at 1% so a flat morning
@@ -42,7 +42,7 @@ export function MoveBars({
         <span className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
           Price move by ticker
         </span>
-        <span className="num text-[10px] text-faint">largest → smallest</span>
+        <span className="num text-[10px] text-faint">gainers → losers</span>
       </div>
       <ul className="flex flex-col gap-1">
         {rows.map((q) => {
