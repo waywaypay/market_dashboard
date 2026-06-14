@@ -3,9 +3,9 @@
  * center zero line: gains run right (green), losses run left (red), so direction
  * and magnitude read at once. A companion to the tiles above that answers
  * "who's moving, and how much" in a single glance. Plain divs sized by percent,
- * no chart dependency — consistent with the rest of the app. Hover and click
- * mirror the tiles: highlight links to the attributed signal, click opens the
- * price-history overlay. */
+ * no chart dependency — consistent with the rest of the app. Hovering (or
+ * focusing) a row highlights its attributed priority signal, mirroring the
+ * tiles. */
 import { useMemo } from "react";
 import type { DailyBrief } from "../lib/contracts";
 import { fmtPct } from "../lib/format";
@@ -16,13 +16,11 @@ export function MoveBars({
   hoverTicker,
   hoverItemId,
   onHover,
-  onVisualize,
 }: {
   brief: DailyBrief;
   hoverTicker: string | null;
   hoverItemId: string | null;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
-  onVisualize: (ticker?: string) => void;
 }) {
   // largest positive move at the top, descending to the largest negative move
   const rows = useMemo(
@@ -57,27 +55,18 @@ export function MoveBars({
           const w = (Math.abs(q.chg_pct) / maxAbs) * 50; // ≤ 50% of the track per side
           const enter = () => onHover(q.ticker, q.driver_item_id ?? null);
           const leave = () => onHover(null, null);
-          const open = () => onVisualize(q.ticker);
           return (
             <li key={q.ticker}>
               <div
-                role="button"
                 tabIndex={0}
                 onMouseEnter={enter}
                 onMouseLeave={leave}
                 onFocus={enter}
                 onBlur={leave}
-                onClick={open}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    open();
-                  }
-                }}
-                aria-label={`${q.ticker} ${fmtPct(q.chg_pct)}${
-                  isSubject ? ", subject" : ""
-                } — chart price history`}
-                className={`group grid cursor-pointer grid-cols-[3.5rem_1fr_3.5rem] items-center gap-2 rounded-sm px-1 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                aria-label={`${q.ticker} ${fmtPct(q.chg_pct)}${isSubject ? ", subject" : ""}${
+                  q.driver_item_id ? ", linked to a priority signal" : ""
+                }`}
+                className={`group grid cursor-default grid-cols-[3.5rem_1fr_3.5rem] items-center gap-2 rounded-sm px-1 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
                   highlighted ? "bg-accent/10" : "hover:bg-ink/5"
                 }`}
               >

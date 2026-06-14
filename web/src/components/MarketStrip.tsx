@@ -1,81 +1,32 @@
-/** Market strip: peer tiles, subject pinned + accented. Sortable by %chg /
- * RVOL / ticker. Hovering a flagged tile highlights its attributed priority
- * signal via driver_item_id — the product's visible point of view. */
-import { useMemo, useState } from "react";
+/** Market strip: peer tiles, subject pinned + accented, in config order.
+ * Hovering a flagged tile highlights its attributed priority signal via
+ * driver_item_id — the product's visible point of view. */
+import { useMemo } from "react";
 import type { DailyBrief, Quote } from "../lib/contracts";
-import { fmtPct, fmtPrice, fmtRvol } from "../lib/format";
+import { fmtPct, fmtPrice } from "../lib/format";
 import { SectionHead } from "./bits";
 import { MoveBars } from "./MoveBars";
-
-type SortKey = "config" | "chg" | "rvol" | "ticker";
 
 export function MarketStrip({
   brief,
   hoverTicker,
   hoverItemId,
   onHover,
-  onVisualize,
 }: {
   brief: DailyBrief;
   hoverTicker: string | null;
   hoverItemId: string | null;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
-  onVisualize: (ticker?: string) => void;
 }) {
-  const [sort, setSort] = useState<SortKey>("config");
-
   const quotes = useMemo(() => {
     const subject = brief.market.find((q) => q.ticker === brief.subject_ticker);
     const rest = brief.market.filter((q) => q.ticker !== brief.subject_ticker);
-    const sorted = [...rest];
-    if (sort === "chg") sorted.sort((a, b) => Math.abs(b.chg_pct) - Math.abs(a.chg_pct));
-    if (sort === "rvol") sorted.sort((a, b) => (b.rvol ?? 0) - (a.rvol ?? 0));
-    if (sort === "ticker") sorted.sort((a, b) => a.ticker.localeCompare(b.ticker));
-    return subject ? [subject, ...sorted] : sorted; // subject always pinned
-  }, [brief, sort]);
+    return subject ? [subject, ...rest] : rest; // subject pinned, peers in config order
+  }, [brief]);
 
   return (
     <section aria-label="Market strip" className="mx-auto max-w-[1400px] px-4 pt-6 sm:px-6">
-      <SectionHead
-        title="Market"
-        hint={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onVisualize()}
-              className="flex items-center gap-1 rounded-sm border border-hairline px-1.5 py-0.5 font-medium text-ink transition-colors hover:border-accent hover:text-accent"
-              title="Overlay 3-month price history for the peer set (or click a tile)"
-            >
-              <span aria-hidden="true">📈</span> Visualize
-            </button>
-            <div className="flex items-center gap-1" role="group" aria-label="Sort tiles">
-              <span className="mr-1 hidden sm:inline">sort</span>
-              {(
-                [
-                  ["config", "peer set"],
-                  ["chg", "%chg"],
-                  ["rvol", "RVOL"],
-                  ["ticker", "A–Z"],
-                ] as [SortKey, string][]
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSort(key)}
-                  aria-pressed={sort === key}
-                  className={`rounded-sm px-1.5 py-0.5 transition-colors ${
-                    sort === key
-                      ? "bg-ink text-white"
-                      : "text-muted hover:text-ink"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        }
-      />
+      <SectionHead title="Market" />
       {quotes.length === 0 ? (
         <p className="text-sm text-muted">
           No quotes this run — the market provider returned nothing.
@@ -92,7 +43,6 @@ export function MarketStrip({
                 (hoverItemId != null && q.driver_item_id === hoverItemId)
               }
               onHover={onHover}
-              onVisualize={onVisualize}
             />
           ))}
         </ul>
@@ -103,7 +53,6 @@ export function MarketStrip({
           hoverTicker={hoverTicker}
           hoverItemId={hoverItemId}
           onHover={onHover}
-          onVisualize={onVisualize}
         />
       )}
     </section>
@@ -115,39 +64,28 @@ function Tile({
   isSubject,
   highlighted,
   onHover,
-  onVisualize,
 }: {
   quote: Quote;
   isSubject: boolean;
   highlighted: boolean;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
-  onVisualize: (ticker?: string) => void;
 }) {
   const dir = quote.chg_pct >= 0 ? "text-up" : "text-down";
   const enter = () => onHover(quote.ticker, quote.driver_item_id ?? null);
   const leave = () => onHover(null, null);
-  const open = () => onVisualize(quote.ticker);
 
   return (
     <li className="min-w-[148px] flex-1 sm:min-w-0">
       <div
-        role="button"
         tabIndex={0}
         onMouseEnter={enter}
         onMouseLeave={leave}
         onFocus={enter}
         onBlur={leave}
-        onClick={open}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            open();
-          }
-        }}
-        aria-label={`${quote.ticker} ${fmtPct(quote.chg_pct)} on ${fmtRvol(quote.rvol)} relative volume${
+        aria-label={`${quote.ticker} ${fmtPct(quote.chg_pct)}${
           quote.flagged ? ", unusual move" : ""
-        }${quote.driver_item_id ? ", linked to a priority signal" : ""} — chart price history`}
-        className={`group h-full cursor-pointer rounded-md border bg-card p-2.5 shadow-tile transition-all hover:border-accent hover:shadow-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+        }${quote.driver_item_id ? ", linked to a priority signal" : ""}`}
+        className={`group h-full cursor-default rounded-md border bg-card p-2.5 shadow-tile transition-all ${
           highlighted
             ? "border-accent ring-2 ring-accent/35 shadow-lift"
             : "border-hairline"
@@ -175,12 +113,11 @@ function Tile({
           <span className="num text-[15px] text-ink">{fmtPrice(quote.last)}</span>
           <span className={`num text-[13px] font-medium ${dir}`}>{fmtPct(quote.chg_pct)}</span>
         </div>
-        <div className="num mt-1 flex items-baseline justify-between text-[11px] text-muted">
-          <span title="Relative volume vs average">{fmtRvol(quote.rvol)} vol</span>
-          {quote.driver_item_id && (
+        {quote.driver_item_id && (
+          <div className="num mt-1 flex justify-end text-[11px]">
             <span className={highlighted ? "text-accent" : "text-faint"}>↳ signal</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </li>
   );
