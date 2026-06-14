@@ -136,6 +136,36 @@ def is_probably_english(*texts: str) -> bool:
     return True  # all content words (e.g. proper nouns) — keep
 
 
+# Hallmarks of a press-release wire / news *index* page — a topic landing page
+# such as GlobeNewswire's "Biotechnology Press Release News" — as opposed to a
+# specific story. Semantic news search (Exa) surfaces these category pages when
+# it matches broad sector keywords, and they carry no datable event: the body is
+# boilerplate ("Browse the latest …") rather than news. Each marker is chosen to
+# be near-exclusive to index/landing pages so a genuine headline is never
+# mistaken for one. Matched lowercased against title + snippet.
+_AGGREGATOR_MARKERS = (
+    "press release news",              # "<Topic> Press Release News" wire category
+    "news and press releases",         # subsumes "breaking news and press releases"
+    "browse the latest",               # "Browse the latest <topic> news"
+    "stay updated on",                 # newsletter CTA dominating a landing page
+    "view all press releases",
+    "latest press releases",
+)
+
+
+def is_aggregator_page(*texts: str) -> bool:
+    """True when a headline/snippet is a press-release wire or news *index* page
+    rather than a specific story.
+
+    These topic landing pages (e.g. GlobeNewswire's "Biotechnology Press Release
+    News") get surfaced by semantic news search over broad sector keywords. They
+    have no event and no datable substance, so they read as spam in the brief.
+    The markers are near-exclusive to index/landing pages, keeping false drops of
+    genuine headlines vanishingly unlikely; anything unmarked is kept."""
+    blob = " ".join(t for t in texts if t).lower()
+    return any(marker in blob for marker in _AGGREGATOR_MARKERS)
+
+
 def infer_ticker(text: str, companies: dict[str, str]) -> str | None:
     """Best-effort ticker_guess from free text: full company name
     (case-insensitive) or exact-case ticker token. Deliberately conservative —

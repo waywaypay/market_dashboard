@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from pipeline.contracts import Quote, RawItem, SourceHealth, UniverseConfig
 from pipeline.market_hours import is_quiet_period
 from pipeline.providers.registry import ProviderSet
-from pipeline.providers.util import is_probably_english
+from pipeline.providers.util import is_aggregator_page, is_probably_english
 
 _SOURCE_RANK = {"edgar": 0, "rss": 1, "news": 2}  # keep the most primary copy
 
@@ -52,6 +52,15 @@ def drop_non_english(items: list[RawItem]) -> list[RawItem]:
     we filter here — the one chokepoint feeding every downstream stage. The
     gate is conservative: it drops the clearly-foreign and keeps the unsure."""
     return [i for i in items if is_probably_english(i.title, i.raw_text)]
+
+
+def drop_aggregator_pages(items: list[RawItem]) -> list[RawItem]:
+    """Drop press-release-wire and news *index* pages (e.g. GlobeNewswire's
+    "Biotechnology Press Release News" topic landing page). Semantic news search
+    surfaces these category pages for broad sector keywords; they carry no event,
+    so they read as spam in the brief. Sits beside drop_non_english as a second
+    headline-hygiene gate at the one source-stage chokepoint."""
+    return [i for i in items if not is_aggregator_page(i.title, i.raw_text)]
 
 
 def dedupe(items: list[RawItem]) -> list[RawItem]:
@@ -138,10 +147,11 @@ def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) 
     # (= generated_at). Enforced here so it holds for every downstream stage.
     fresh = [i for items in raw.values() for i in items if i.ts <= now]
 
-    # Drop non-English headlines before dedupe/brief. Health (below) is measured
-    # on the look-ahead set, not this one, so a foreign-heavy feed still reports
-    # its true connectivity rather than reading as stale.
-    items = dedupe(drop_non_english(fresh))
+    # Headline hygiene before dedupe/brief: drop foreign-language stories and
+    # press-release/aggregator index pages. Health (below) is measured on the
+    # look-ahead set, not this filtered one, so a foreign- or spam-heavy feed
+    # still reports its true connectivity rather than reading as stale.
+    items = dedupe(drop_aggregator_pages(drop_non_english(fresh)))
     quotes = [
         q.model_copy(
             update={"rvol": round(q.volume / q.avg_volume, 2) if q.avg_volume else None}
