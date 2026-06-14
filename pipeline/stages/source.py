@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from pipeline.contracts import Quote, RawItem, SourceHealth, UniverseConfig
 from pipeline.market_hours import is_quiet_period
 from pipeline.providers.registry import ProviderSet
+from pipeline.providers.util import is_aggregator_page
 
 _SOURCE_RANK = {"edgar": 0, "rss": 1, "news": 2}  # keep the most primary copy
 
@@ -42,6 +43,15 @@ def _is_dupe(a: RawItem, b: RawItem) -> bool:
     if _norm_url(a.url) == _norm_url(b.url):
         return True
     return SequenceMatcher(None, _norm_title(a.title), _norm_title(b.title)).ratio() >= 0.90
+
+
+def drop_aggregator_pages(items: list[RawItem]) -> list[RawItem]:
+    """Drop press-release-wire and news *index* pages (e.g. GlobeNewswire's
+    "Biotechnology Press Release News" topic landing page). Semantic news search
+    surfaces these category pages for broad sector keywords; they carry no event,
+    so they read as spam in the brief. Runs before dedupe at the one source-stage
+    chokepoint feeding every downstream stage."""
+    return [i for i in items if not is_aggregator_page(i.title, i.raw_text)]
 
 
 def dedupe(items: list[RawItem]) -> list[RawItem]:
@@ -128,7 +138,10 @@ def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) 
     # (= generated_at). Enforced here so it holds for every downstream stage.
     fresh = [i for items in raw.values() for i in items if i.ts <= now]
 
-    items = dedupe(fresh)
+    # Headline hygiene before dedupe/brief: drop press-release/aggregator index
+    # pages. Health (below) is measured on the look-ahead set, not this filtered
+    # one, so a spam-heavy feed still reports its true connectivity.
+    items = dedupe(drop_aggregator_pages(fresh))
     quotes = [
         q.model_copy(
             update={"rvol": round(q.volume / q.avg_volume, 2) if q.avg_volume else None}
