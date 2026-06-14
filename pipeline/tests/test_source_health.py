@@ -93,17 +93,22 @@ def test_health_provider_error_always_fails() -> None:
 
 
 def test_quote_health_vendor_outage_is_red_in_session_soft_when_quiet() -> None:
-    err = RuntimeError("all quote vendors failed — YahooQuoteProvider: ...; StooqProvider: 404")
+    err = RuntimeError(
+        "all quote vendors failed — YahooQuoteProvider: HTTP 429; "
+        "StooqQuoteProvider: HTTP 404; AlphaVantageQuoteProvider: HTTP 403"
+    )
 
     in_session = _quote_health([], err, SESSION_NOW, quiet=False)
     assert in_session.status == "failed"
-    # the raw vendor chain stays in the logs; the rail gets a clean line
-    assert "Yahoo" not in (in_session.detail or "") and "404" not in (in_session.detail or "")
-    assert "temporarily unavailable" in (in_session.detail or "")
+    assert "unavailable" in (in_session.detail or "")
+    # the per-vendor reason is surfaced so a headless deploy is debuggable...
+    assert "AlphaVantage" in (in_session.detail or "") and "404" in (in_session.detail or "")
+    # ...but the noisy "all quote vendors failed" boilerplate is stripped
+    assert "all quote vendors failed" not in (in_session.detail or "")
 
     between = _quote_health([], err, SESSION_NOW, quiet=True)
     assert between.status == "stale"  # no pre-market tape is expected between sessions
-    assert "between sessions" in (between.detail or "")
+    assert "between sessions" in (between.detail or "") and "404" in (between.detail or "")
 
 
 def test_quote_health_ok_when_quotes_present() -> None:

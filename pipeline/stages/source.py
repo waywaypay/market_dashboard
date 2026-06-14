@@ -147,24 +147,24 @@ def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) 
 def _quote_health(
     quotes: list[Quote], error: Exception | None, now: datetime, quiet: bool
 ) -> SourceHealth:
-    """Quote health in the product's voice. The raw vendor chain error already
-    went to the logs; the rail gets a clean line. Between sessions there is no
-    pre-market tape to expect, so an outage is a soft amber, not a red ✕."""
+    """Quote health in the product's voice. The per-vendor reason is surfaced
+    (concisely — the noisy prefix stripped) so a headless deploy is debuggable
+    from the rail alone. Between sessions there is no pre-market tape to expect,
+    so an outage is a soft amber, not a red ✕."""
     if error is not None:
+        reason = _quote_failure_reason(error)
         if quiet:
             return SourceHealth(
                 provider="quotes",
                 status="stale",
                 last_ts=None,
-                detail="No live quotes between sessions — vendors unreachable; "
-                "resumes when the market reopens.",
+                detail=f"No live quotes between sessions — {reason}",
             )
         return SourceHealth(
             provider="quotes",
             status="failed",
             last_ts=None,
-            detail="All quote vendors failed this run — live market data is "
-            "temporarily unavailable (it resumes automatically).",
+            detail=f"Live market data unavailable — {reason}",
         )
     if quotes:
         return SourceHealth(provider="quotes", status="ok", last_ts=now, detail=None)
@@ -173,3 +173,10 @@ def _quote_health(
             provider="quotes", status="ok", last_ts=None, detail="No quotes — quiet between sessions"
         )
     return SourceHealth(provider="quotes", status="stale", last_ts=None, detail=None)
+
+
+def _quote_failure_reason(error: Exception, limit: int = 240) -> str:
+    """Concise per-vendor reason for the rail: the chain lists why each vendor
+    failed; drop the boilerplate prefix and cap the length."""
+    msg = str(error).replace("all quote vendors failed — ", "").strip()
+    return msg if len(msg) <= limit else msg[: limit - 1] + "…"

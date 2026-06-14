@@ -41,6 +41,24 @@ QUOTE_URL = "https://www.alphavantage.co/query"
 DEFAULT_SIGMA = 3.0  # GLOBAL_QUOTE has no history; ship a conservative stand-in
 US_EASTERN = ZoneInfo("America/New_York")
 
+# Accept the obvious spellings — a key set under the wrong name is the easiest
+# way to silently get an empty strip, so we look past the exact env name.
+_KEY_ENV_ALIASES = (
+    "ALPHAVANTAGE_API_KEY",
+    "ALPHA_VANTAGE_API_KEY",
+    "ALPHAVANTAGE_KEY",
+    "AV_API_KEY",
+)
+
+
+def api_key_from_env() -> str | None:
+    for name in _KEY_ENV_ALIASES:
+        value = os.environ.get(name)
+        if value:
+            return value.strip()
+    return None
+
+
 # ticker -> (monotonic fetch time, Quote | None). None is a cached miss. Shared
 # across the per-run provider instances the registry builds, so the strict
 # daily budget survives refreshes within a process.
@@ -66,7 +84,7 @@ class AlphaVantageQuoteProvider(QuoteProvider):
         transport: httpx.BaseTransport | None = None,
     ):
         self.companies = companies or {}
-        self.api_key = api_key if api_key is not None else os.environ.get("ALPHAVANTAGE_API_KEY")
+        self.api_key = api_key if api_key is not None else api_key_from_env()
         self.throttle_s = throttle_s  # 5 req/min free-tier ceiling -> pace requests
         self.ttl_s = float(
             ttl_s if ttl_s is not None else os.environ.get("ALPHAVANTAGE_TTL_S", "43200")
@@ -136,6 +154,10 @@ class AlphaVantageQuoteProvider(QuoteProvider):
         if response.status_code != 200:
             raise RuntimeError(f"Alpha Vantage HTTP {response.status_code}")
         data = response.json()
+        # An invalid/missing key (or bad param) comes back 200 with this — a real
+        # error worth surfacing, not a benign "unknown symbol" to cache as a miss.
+        if "Error Message" in data:
+            raise RuntimeError(f"Alpha Vantage rejected the request: {str(data['Error Message'])[:160]}")
         if "Note" in data or "Information" in data:  # frequency/quota notice (still 200)
             raise _RateLimited(str(data.get("Note") or data.get("Information"))[:160])
         row = data.get("Global Quote") or {}

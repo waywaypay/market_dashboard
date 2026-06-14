@@ -870,6 +870,32 @@ def test_alphavantage_stays_flat_during_premarket() -> None:
     assert q.last == 111.3 and q.chg_pct == 0.0 and q.volume == 0
 
 
+def test_alphavantage_reads_key_from_env_aliases(monkeypatch) -> None:
+    for name in ("ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY", "ALPHAVANTAGE_KEY", "AV_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    # a key set under a near-miss name is the easiest way to get a silent empty
+    # strip — the provider looks past the exact spelling
+    monkeypatch.setenv("ALPHA_VANTAGE_API_KEY", "abc")
+    assert AlphaVantageQuoteProvider(companies=COMPANIES).api_key == "abc"
+
+
+def test_alphavantage_surfaces_an_invalid_key_error() -> None:
+    def bad_key(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"Error Message": "the parameter apikey is invalid or missing"})
+
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="bogus",
+        throttle_s=0,
+        now=AV_WEEKEND_NOW,
+        transport=httpx.MockTransport(bad_key),
+    )
+    # surfaced as a real error (not masked as an unknown symbol, not cached as a miss)
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["VCYT"])
+    assert "VCYT" not in alphavantage_quotes._QUOTE_CACHE  # a bad key must not poison the cache
+
+
 def test_alphavantage_requires_a_key() -> None:
     provider = AlphaVantageQuoteProvider(companies=COMPANIES, api_key=None)
     provider.api_key = None  # defeat any ambient ALPHAVANTAGE_API_KEY

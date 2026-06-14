@@ -54,7 +54,8 @@ def test_alphavantage_tier_joins_the_quote_chain_only_with_a_key(monkeypatch) ->
     monkeypatch.setenv("BRIEF_EMAIL", "fixture")
     monkeypatch.setenv("BRIEF_CLASSIFIER", "fixture")
 
-    monkeypatch.delenv("ALPHAVANTAGE_API_KEY", raising=False)
+    for name in ("ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY", "ALPHAVANTAGE_KEY", "AV_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
     chain = build_providers(universe, EVAL_NOW).quotes
     assert isinstance(chain, FallbackQuoteProvider)
     names = [type(p).__name__ for p in chain.providers]

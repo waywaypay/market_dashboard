@@ -126,10 +126,14 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
             StooqQuoteProvider(companies=universe.companies, now=now),
         ]
         # Last resort: a keyed vendor that answers from cloud IPs the keyless
-        # tiers are blocked on. Only joins the chain when a key is present.
-        if os.environ.get("ALPHAVANTAGE_API_KEY"):
-            from pipeline.providers.alphavantage_quotes import AlphaVantageQuoteProvider
+        # tiers are blocked on. Only joins the chain when a key is present
+        # (under any of the accepted env-var aliases).
+        from pipeline.providers.alphavantage_quotes import (
+            AlphaVantageQuoteProvider,
+            api_key_from_env,
+        )
 
+        if api_key_from_env():
             chain.append(AlphaVantageQuoteProvider(companies=universe.companies, now=now))
         return FallbackQuoteProvider(*chain)
 
