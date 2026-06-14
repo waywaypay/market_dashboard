@@ -81,7 +81,9 @@ class StooqQuoteProvider(QuoteProvider):
         self.throttle_s = throttle_s
         self.max_attempts = max_attempts
         self.backoff_s = backoff_s
-        self._client = make_client(transport=transport, timeout=10.0)
+        # route via the egress proxy when one is configured (Stooq bot-walls
+        # datacenter IPs); direct otherwise
+        self._client = make_client(transport=transport, timeout=10.0, use_proxy=True)
 
     # -- public interface ---------------------------------------------------
 

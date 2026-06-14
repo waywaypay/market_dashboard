@@ -151,6 +151,13 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   the easiest way to silently get an empty strip. Each keyed tier honors the
   same as-of-close/flat-pre-market rule; none carries trailing history, so
   `sigma` falls back to a conservative default.
+* **Egress proxy (optional)** — instead of (or alongside) the keyed tiers, an
+  outbound proxy makes the keyless vendors work from a non-datacenter IP, which
+  restores Yahoo's pre-market tape + volumes (the best source). Set
+  `MASSIVE_USERNAME` + `MASSIVE_KEY` ([joinmassive.com](https://joinmassive.com))
+  — or `MASSIVE_PROXY_URL` for any proxy — and the Yahoo/Stooq HTTP clients
+  route through it (a key without a username is ignored, since the proxy needs
+  `user:key`). Other sources (EDGAR/RSS/news) stay direct.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 

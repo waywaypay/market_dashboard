@@ -97,6 +97,7 @@ class YahooQuoteProvider(QuoteProvider):
             transport=transport,
             headers={"User-Agent": BROWSER_UA, "Accept": "application/json"},
             timeout=8.0,  # Yahoo answers fast or not at all
+            use_proxy=True,  # route via the egress proxy when one is configured
         )
 
     # -- public interface ---------------------------------------------------

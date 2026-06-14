@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from html import unescape
+from urllib.parse import quote
 
 import httpx
 
@@ -23,20 +25,60 @@ def user_agent() -> str:
     )
 
 
+def egress_proxy() -> str | None:
+    """Optional outbound proxy for providers whose vendor blocks shared cloud
+    egress IPs (Yahoo 429, Stooq bot-wall). A residential proxy makes those
+    requests come from a non-datacenter IP so they stop being blocked.
+
+    Configured by env, most-specific first:
+      * MASSIVE_PROXY_URL / EGRESS_PROXY_URL — a full proxy URL, used verbatim;
+      * MASSIVE_KEY + MASSIVE_USERNAME — Massive (joinmassive.com) credentials,
+        assembled into http://user:key@network.joinmassive.com:65534.
+    Returns None when unconfigured (providers then go direct, unchanged). A key
+    without a username can't authenticate, so we warn and stay direct rather
+    than silently sending broken requests."""
+    url = os.environ.get("MASSIVE_PROXY_URL") or os.environ.get("EGRESS_PROXY_URL")
+    if url:
+        return url
+    key = match_api_key({"MASSIVEKEY", "MASSIVEAPIKEY"})
+    if not key:
+        return None
+    user = (
+        os.environ.get("MASSIVE_USERNAME")
+        or os.environ.get("MASSIVE_PROXY_USERNAME")
+        or os.environ.get("MASSIVE_USER")
+    )
+    if not user:
+        print(
+            "[egress] MASSIVE_KEY is set but no MASSIVE_USERNAME — Massive needs "
+            "both (user:key); set MASSIVE_USERNAME or MASSIVE_PROXY_URL. Going direct.",
+            file=sys.stderr,
+        )
+        return None
+    host = os.environ.get("MASSIVE_PROXY_HOST", "network.joinmassive.com")
+    port = os.environ.get("MASSIVE_PROXY_PORT", "65534")  # http CONNECT port
+    return f"http://{quote(user, safe='')}:{quote(key, safe='')}@{host}:{port}"
+
+
 def make_client(
     transport: httpx.BaseTransport | None = None,
     headers: dict[str, str] | None = None,
     timeout: float = 15.0,
+    use_proxy: bool = False,
 ) -> httpx.Client:
-    """Client factory; tests inject httpx.MockTransport here."""
+    """Client factory; tests inject httpx.MockTransport here. Providers that get
+    IP-blocked pass use_proxy=True to route through the egress proxy when one is
+    configured (never when a test transport is injected)."""
     merged = {"User-Agent": user_agent()}
     if headers:
         merged.update(headers)
+    proxy = egress_proxy() if (use_proxy and transport is None) else None
     return httpx.Client(
         transport=transport,
         headers=merged,
         timeout=timeout,
         follow_redirects=True,
+        proxy=proxy,
     )
 
 
