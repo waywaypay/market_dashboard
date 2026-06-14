@@ -50,3 +50,11 @@ services:
         sync: false # finnhub.io — per-ticker quote, 60 req/min free
       - key: ALPHAVANTAGE_API_KEY
         sync: false # alphavantage.co — GLOBAL_QUOTE, 25 req/day free (last resort)
+      # Optional egress proxy (Massive / joinmassive.com): routes the keyless
+      # tiers (Yahoo, Stooq) through a residential IP so they stop being blocked
+      # — restores the pre-market tape + volumes from the best source. Needs
+      # BOTH a username and the key (or set MASSIVE_PROXY_URL with a full URL).
+      - key: MASSIVE_USERNAME
+        sync: false # Massive proxy username
+      - key: MASSIVE_KEY
+        sync: false # Massive proxy API key (the password half of user:key)
