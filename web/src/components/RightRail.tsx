@@ -2,6 +2,7 @@
  * threshold slider, and the "Generate today's First Read →" action. On
  * mobile this renders above the main column. */
 import type { DailyBrief } from "../lib/contracts";
+import type { Watchlist } from "../lib/watchlists";
 import { categoryColor } from "../lib/colors";
 import { fmtClock, minutesAgo } from "../lib/format";
 
@@ -14,6 +15,10 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 export function RightRail({
   brief,
+  watchlists,
+  activeWatchlistId,
+  onSelectWatchlist,
+  onManageWatchlists,
   activeCategories,
   onToggleCategory,
   minMateriality,
@@ -21,12 +26,17 @@ export function RightRail({
   onGenerate,
 }: {
   brief: DailyBrief;
+  watchlists: Watchlist[];
+  activeWatchlistId: string | null;
+  onSelectWatchlist: (id: string | null) => void;
+  onManageWatchlists: () => void;
   activeCategories: Set<string>;
   onToggleCategory: (category: string) => void;
   minMateriality: number;
   onMinMateriality: (v: number) => void;
   onGenerate: () => void;
 }) {
+  const active = watchlists.find((w) => w.id === activeWatchlistId) ?? null;
   return (
     <aside aria-label="Controls and source health" className="space-y-4">
       <button
@@ -36,6 +46,36 @@ export function RightRail({
       >
         Generate today's First Read →
       </button>
+
+      <RailCard title="Watchlist">
+        <select
+          value={activeWatchlistId ?? ""}
+          onChange={(e) => onSelectWatchlist(e.target.value || null)}
+          aria-label="Active watchlist"
+          className="w-full rounded-sm border border-hairline bg-card px-2 py-1.5 text-[13px] text-ink"
+        >
+          <option value="">All names ({brief.market.length})</option>
+          {watchlists.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name || "Untitled"} · {w.tickers.length}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={onManageWatchlists}
+          className="mt-2 w-full rounded-sm border border-hairline px-2 py-1.5 text-[12px] font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+        >
+          {watchlists.length ? "Manage watchlists…" : "＋ New watchlist…"}
+        </button>
+        {active && (
+          <p className="mt-2 text-[11px] leading-snug text-muted">
+            Focused on{" "}
+            <span className="num text-ink">{active.tickers.length}</span>{" "}
+            name{active.tickers.length === 1 ? "" : "s"} — choose “All names” to clear.
+          </p>
+        )}
+      </RailCard>
 
       <RailCard title="Filters">
         <div className="flex flex-wrap gap-1.5">

@@ -18,8 +18,10 @@ import { SectorHeadlines } from "./components/SectorHeadlines";
 import { RightRail } from "./components/RightRail";
 import { EmailModal } from "./components/EmailModal";
 import { VisualizeModal } from "./components/VisualizeModal";
+import { WatchlistModal } from "./components/WatchlistModal";
 import type { DailyBrief, Item, UniverseEntry } from "./lib/contracts";
 import { loadBrief, loadUniverses, refreshPipeline } from "./lib/loadBrief";
+import { useWatchlists } from "./lib/watchlists";
 
 type LoadState =
   | { phase: "loading" }
@@ -40,6 +42,7 @@ export default function App() {
   const [minMateriality, setMinMateriality] = useState(1);
   const [emailOpen, setEmailOpen] = useState(false);
   const [visualizeOpen, setVisualizeOpen] = useState(false);
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
 
   const fetchBrief = useCallback(async (universeId?: string) => {
     setRefreshing(true);
@@ -88,11 +91,26 @@ export default function App() {
 
   const brief = state.phase === "ready" ? state.brief : null;
 
+  // Custom watchlists are a personal lens over the current universe's names,
+  // saved in localStorage (scoped to the universe). An active one focuses the
+  // whole cockpit on its tickers; "All names" (null) is the unfiltered default.
+  const wl = useWatchlists(brief?.universe_id ?? "");
+  const activeWatchlist = wl.activeWatchlist;
+
+  const inWatchlist = useCallback(
+    (ticker: string) => !activeWatchlist || activeWatchlist.tickers.includes(ticker),
+    [activeWatchlist],
+  );
+
   const visible = useMemo(() => {
+    const members = activeWatchlist ? new Set(activeWatchlist.tickers) : null;
     return (item: Item) =>
       item.materiality >= minMateriality &&
-      (activeCategories.size === 0 || activeCategories.has(item.category));
-  }, [activeCategories, minMateriality]);
+      (activeCategories.size === 0 || activeCategories.has(item.category)) &&
+      // when a watchlist is focused, only its named items survive (sector-wide
+      // items have no ticker, so they drop out of the focused view)
+      (members === null || (item.ticker != null && members.has(item.ticker)));
+  }, [activeCategories, minMateriality, activeWatchlist]);
 
   const onTileHover = useCallback((ticker: string | null, driverItemId: string | null) => {
     setHoverTicker(ticker);
@@ -155,6 +173,11 @@ export default function App() {
             hoverItemId={hoverItemId}
             onHover={onTileHover}
             onVisualize={() => setVisualizeOpen(true)}
+            watchlistActive={activeWatchlist !== null}
+            inWatchlist={inWatchlist}
+            onToggleMember={(ticker) =>
+              activeWatchlist && wl.toggleTicker(activeWatchlist.id, ticker)
+            }
           />
           <div id="signals">
             <PrioritySignals
@@ -172,6 +195,10 @@ export default function App() {
         <div className="order-first px-4 pt-6 sm:px-6 lg:order-none lg:w-[300px] lg:shrink-0 lg:px-0 lg:pt-6">
           <RightRail
             brief={brief}
+            watchlists={wl.watchlists}
+            activeWatchlistId={wl.activeId}
+            onSelectWatchlist={wl.setActiveId}
+            onManageWatchlists={() => setWatchlistOpen(true)}
             activeCategories={activeCategories}
             onToggleCategory={(cat) =>
               setActiveCategories((prev) => {
@@ -191,6 +218,20 @@ export default function App() {
       {emailOpen && <EmailModal brief={brief} onClose={() => setEmailOpen(false)} />}
       {visualizeOpen && (
         <VisualizeModal brief={brief} onClose={() => setVisualizeOpen(false)} />
+      )}
+      {watchlistOpen && (
+        <WatchlistModal
+          brief={brief}
+          watchlists={wl.watchlists}
+          activeId={wl.activeId}
+          onClose={() => setWatchlistOpen(false)}
+          onCreate={() => wl.createWatchlist()}
+          onRename={wl.renameWatchlist}
+          onDelete={wl.deleteWatchlist}
+          onSetActive={wl.setActiveId}
+          onToggleTicker={wl.toggleTicker}
+          onSetMembers={wl.setMembers}
+        />
       )}
     </div>
   );
