@@ -10,15 +10,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from pipeline.contracts import (
-    Counts,
-    DailyBrief,
-    Item,
-    PricePoint,
-    Quote,
-    SourceHealth,
-    UniverseConfig,
-)
+from pipeline.contracts import Counts, DailyBrief, Item, Quote, SourceHealth, UniverseConfig
 
 # Providers whose mode determines whether the DATA in the brief is real.
 # Email transport is delivery, not data, so it never taints data_mode.
@@ -56,7 +48,6 @@ def assemble_brief(
     generated_at: datetime,
     market_open_at: datetime,
     provider_modes: dict[str, str] | None = None,
-    history: dict[str, list[PricePoint]] | None = None,
 ) -> DailyBrief:
     hot = universe.thresholds.hot_materiality
 
@@ -95,7 +86,6 @@ def assemble_brief(
         classifier_engine=engine,
         data_mode=derive_data_mode(provider_modes or {}),  # type: ignore[arg-type]
         provider_modes=provider_modes or {},
-        history=history or {},
     )
 
 

@@ -10,18 +10,6 @@ export function categoryColor(category: string, categories: string[]): string {
   return PALETTE[(idx >= 0 ? idx : categories.length) % PALETTE.length];
 }
 
-// Distinct, readable line colors for the multi-ticker price chart. Assigned by
-// position (subject is drawn in ACCENT separately), wrapping if a universe has
-// more peers than hues.
-const SERIES_PALETTE = [
-  "#2563EB", "#D97706", "#7C3AED", "#0891B2", "#DB2777", "#16A34A",
-  "#DC2626", "#0D9488", "#9333EA", "#CA8A04", "#2DD4BF", "#E11D48",
-];
-
-export function seriesColor(index: number): string {
-  return SERIES_PALETTE[index % SERIES_PALETTE.length];
-}
-
 export const ACCENT = "#0E7C7B";
 export const UP = "#1A7F4B";
 export const DOWN = "#B42318";

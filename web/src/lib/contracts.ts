@@ -57,11 +57,6 @@ export const countsSchema = z.object({
   hot_items: z.number().int(),
 });
 
-export const pricePointSchema = z.object({
-  d: z.string(), // ISO date YYYY-MM-DD
-  c: z.number(), // close
-});
-
 export const dailyBriefSchema = z.object({
   universe_id: z.string(),
   generated_at: z.string(),
@@ -83,9 +78,6 @@ export const dailyBriefSchema = z.object({
   // banner must never give synthetic data the benefit of the doubt
   data_mode: z.enum(["real", "fixture", "mixed"]).default("fixture"),
   provider_modes: z.record(z.string(), z.string()).default({}),
-  // historical daily closes per ticker for the overlay chart; best-effort, so
-  // older/degraded artifacts (no history source) simply default to empty
-  history: z.record(z.string(), z.array(pricePointSchema)).default({}),
 });
 
 export const universeEntrySchema = z.object({
@@ -96,7 +88,6 @@ export const universeEntrySchema = z.object({
 });
 
 export type Quote = z.infer<typeof quoteSchema>;
-export type PricePoint = z.infer<typeof pricePointSchema>;
 export type PriceReaction = z.infer<typeof priceReactionSchema>;
 export type Item = z.infer<typeof itemSchema>;
 export type SourceHealth = z.infer<typeof sourceHealthSchema>;

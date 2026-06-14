@@ -16,7 +16,6 @@ import { ByCompany } from "./components/ByCompany";
 import { SectorHeadlines } from "./components/SectorHeadlines";
 import { RightRail } from "./components/RightRail";
 import { EmailModal } from "./components/EmailModal";
-import { VisualizeModal } from "./components/VisualizeModal";
 import type { DailyBrief, Item, UniverseEntry } from "./lib/contracts";
 import { loadBrief, loadUniverses, refreshPipeline } from "./lib/loadBrief";
 
@@ -38,9 +37,6 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [minMateriality, setMinMateriality] = useState(1);
   const [emailOpen, setEmailOpen] = useState(false);
-  const [visualize, setVisualize] = useState<{ open: boolean; focus?: string }>({
-    open: false,
-  });
 
   const fetchBrief = useCallback(async (universeId?: string) => {
     setRefreshing(true);
@@ -154,7 +150,6 @@ export default function App() {
             hoverTicker={hoverTicker}
             hoverItemId={hoverItemId}
             onHover={onTileHover}
-            onVisualize={(ticker) => setVisualize({ open: true, focus: ticker })}
           />
           <div id="signals">
             <PrioritySignals
@@ -189,13 +184,6 @@ export default function App() {
       </div>
 
       {emailOpen && <EmailModal brief={brief} onClose={() => setEmailOpen(false)} />}
-      {visualize.open && (
-        <VisualizeModal
-          brief={brief}
-          focusTicker={visualize.focus}
-          onClose={() => setVisualize({ open: false })}
-        />
-      )}
     </div>
   );
 }
