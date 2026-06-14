@@ -60,6 +60,11 @@ def run_universe(
         provider_modes=providers.modes,
         history=history,
     )
+    # "Today's First Read" — the narrative lede, written over the assembled
+    # brief (Venice when keyed, else the deterministic composer; never raises).
+    first_read = providers.first_read.generate(brief, universe)
+    brief.first_read = first_read.text
+    brief.first_read_engine = first_read.engine
 
     written = write_artifacts(brief, web_public, default=default)
     receipt_note = "email skipped"
@@ -75,7 +80,8 @@ def run_universe(
     print(
         f"[{universe.id}] {brief.counts.total_items} items "
         f"({brief.counts.hot_items} hot), {sum(1 for q in brief.market if q.flagged)} flagged moves, "
-        f"engine={brief.classifier_engine}, data={brief.data_mode} -> {written[0]}; {receipt_note}"
+        f"engine={brief.classifier_engine}, first_read={brief.first_read_engine}, "
+        f"data={brief.data_mode} -> {written[0]}; {receipt_note}"
     )
     return brief
 

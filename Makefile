@@ -12,6 +12,7 @@
 #
 # Env knobs (see pipeline/providers/registry.py):
 #   BRIEF_PROVIDERS=fixture|real      BRIEF_CLASSIFIER=auto|fixture|rules|anthropic
+#   BRIEF_FIRST_READ=auto|fixture|venice  (VeniceAI narrates today's First Read)
 
 PY      := .venv/bin/python
 PIP     := .venv/bin/pip

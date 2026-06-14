@@ -14,6 +14,7 @@ from pipeline.contracts import EmailReceipt, Quote, RawItem
 from pipeline.providers.base import (
     EdgarProvider,
     EmailProvider,
+    FirstReadProvider,
     NewsProvider,
     QuoteProvider,
     RSSProvider,
@@ -22,6 +23,7 @@ from pipeline.providers.fixture import (
     FixtureClassifierProvider,
     FixtureEdgarProvider,
     FixtureEmailProvider,
+    FixtureFirstReadProvider,
     FixtureNewsProvider,
     FixtureQuoteProvider,
     FixtureRSSProvider,
@@ -36,6 +38,7 @@ from pipeline.providers.finnhub_quotes import FinnhubQuoteProvider
 from pipeline.providers.real_stubs import SmtpEmailProvider
 from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.stooq_quotes import StooqQuoteProvider
+from pipeline.providers.venice_first_read import VeniceFirstReadProvider
 from pipeline.providers.yahoo_quotes import YahooQuoteProvider
 from pipeline.contracts.universe import RSSFeed
 
@@ -47,6 +50,7 @@ def test_fixture_providers_subclass_interfaces() -> None:
     assert issubclass(FixtureEdgarProvider, EdgarProvider)
     assert issubclass(FixtureNewsProvider, NewsProvider)
     assert issubclass(FixtureQuoteProvider, QuoteProvider)
+    assert issubclass(FixtureFirstReadProvider, FirstReadProvider)
     assert issubclass(FixtureEmailProvider, EmailProvider)
 
 
@@ -60,6 +64,7 @@ def test_real_providers_subclass_interfaces() -> None:
     assert issubclass(FmpQuoteProvider, QuoteProvider)
     assert issubclass(FinnhubQuoteProvider, QuoteProvider)
     assert issubclass(FallbackQuoteProvider, QuoteProvider)
+    assert issubclass(VeniceFirstReadProvider, FirstReadProvider)
     # remaining stub still satisfies the interface (vendor TBD)
     assert issubclass(SmtpEmailProvider, EmailProvider)
 

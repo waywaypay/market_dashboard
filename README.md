@@ -9,7 +9,9 @@ Two fused layers:
 
 1. **News brief** — RSS + SEC EDGAR + news search, deduped, then classified and
    summarized by Claude in a single batched call (category, materiality 1–5,
-   subject-relevance, house-style summary, one-line TL;DR).
+   subject-relevance, house-style summary, one-line TL;DR). The assembled brief
+   is then narrated into **today's First Read** — a short morning note — by the
+   **VeniceAI** API (deterministic composer when no key is set).
 2. **Market analytics** — pre-market price/volume per ticker, unusual-move
    detection (`abs(%chg) ≥ 2σ` or `RVOL ≥ 2`), and the signature feature:
    deterministic **price↔news attribution** — every flagged move is linked to
@@ -42,8 +44,9 @@ make eval    # gate evals (classify/summarize handoff gate is the priority gate)
 Two services, one repo. `pipeline/` is Python; `web/` is React + Vite + TS +
 Tailwind, a **read-only consumer** of the pipeline's artifact plus one action
 (ship the email). Deterministic orchestration over LLM routing: the DAG is
-fixed in `pipeline/orchestrator.py`, and the only LLM call lives inside the
-process stage.
+fixed in `pipeline/orchestrator.py`. Two LLM calls fill in content but never
+decide control flow — Claude classification in the process stage, and the
+VeniceAI "First Read" narration over the already-assembled brief.
 
 ```
 universes/*.yaml ──► orchestrator (deterministic DAG, no LLM routing)
@@ -55,8 +58,8 @@ universes/*.yaml ──► orchestrator (deterministic DAG, no LLM routing)
                        │  (validate → retry once → rule-based fallback; never crashes)
    fuse stage          │  flag unusual moves; attribute driver_item_id;
                        │  attach price_reaction badges  (pure Python, no LLM)
-   output stage        │  DailyBrief artifact → web/public/brief.json
-                       ▼  + First Read email rendered from the SAME artifact
+   output stage        │  DailyBrief artifact + Venice "First Read" narrative
+                       ▼  → web/public/brief.json + First Read email (SAME artifact)
               web/public/briefs/<id>.json ──► dashboard (and /api/ship → email)
 ```
 
@@ -78,6 +81,7 @@ Every external dependency sits behind a typed interface in
 | `NewsProvider`       | synthetic search results           | **`ExaNewsProvider` (working)** — Exa semantic news search|
 | `QuoteProvider`      | seeded pre-market snapshot         | **Yahoo → Stooq → FMP → Finnhub → Alpha Vantage chain (working)** — keyless first, keyed tiers when their keys are set |
 | `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)                   |
+| `FirstReadProvider`  | deterministic narrative composer   | **`VeniceFirstReadProvider` (working)** — VeniceAI chat API|
 | `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                         |
 
 Selection is env-driven (never LLM-driven). `BRIEF_PROVIDERS=fixture|real`
@@ -93,6 +97,7 @@ rendered in the rail), not crashes.
 export SEC_EDGAR_USER_AGENT="yourapp/1.0 you@example.com"  # SEC fair-access policy
 export EXA_API_KEY="..."                                   # https://exa.ai
 export ANTHROPIC_API_KEY="..."                             # real classification
+export VENICE_API_KEY="..."                                # https://venice.ai — narrates today's First Read
 # optional keyed quote tiers (any one suffices; they answer from cloud IPs the
 # keyless vendors get blocked on):
 export FMP_KEY="..."                                       # financialmodelingprep.com (batched, RVOL)
@@ -153,6 +158,14 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   `sigma` falls back to a conservative default.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
+* **First Read** — `BRIEF_FIRST_READ=auto` (default) narrates the morning note
+  with the **VeniceAI** chat API (OpenAI-compatible; no SDK, plain HTTP) when
+  `VENICE_API_KEY` is set, else a deterministic composer. The key is matched
+  flexibly by normalized name (`VENICE_KEY`, `VENICE_AI_API_KEY`, … all
+  resolve); model is `BRIEF_VENICE_MODEL` (default `llama-3.3-70b`). Like the
+  classifier it can never crash a run: bad/empty/erroring responses retry once
+  then fall back to the composer, so the brief always ships a note. Force it
+  with `BRIEF_FIRST_READ=venice|fixture`.
 
 The cross-source dedupe, ticker inference, look-ahead guard, fuse attribution,
 and all eval gates apply identically to real data. Wire-format correctness is
@@ -185,7 +198,8 @@ See `universes/diagnostics.yaml` for the annotated reference.
 
 Skim-first, dense, top-to-bottom: header band (live "opens in mm:ss"
 countdown, universe selector, refresh) → **The Read** (TL;DR + counts) →
-sortable market strip (subject pinned) → priority signals → collapsible
+**Today's First Read** (the Venice-narrated morning note) → sortable market
+strip (subject pinned) → priority signals → collapsible
 by-company cards → sector headlines, with source health, category filters, a
 materiality slider, and **Generate today's First Read →** in the right rail.
 
@@ -241,8 +255,10 @@ explicitly for a synthetic demo deploy. Two sources stay dark until you set
 secrets in the Render dashboard:
 `EXA_API_KEY` (news search shows "failed" in the rail until then) and
 `ANTHROPIC_API_KEY` (classification falls back to rule-based tagging until
-then); also set `SEC_EDGAR_USER_AGENT` to your contact per SEC fair-access
-policy. If the deploy's egress IP is banned by *both* keyless quote vendors
+then). `VENICE_API_KEY` is optional — today's First Read is narrated by a
+deterministic composer until it is set, then by the VeniceAI API. Also set
+`SEC_EDGAR_USER_AGENT` to your contact per SEC fair-access policy. If the
+deploy's egress IP is banned by *both* keyless quote vendors
 (Yahoo and Stooq), set `ALPHAVANTAGE_API_KEY` to add the keyed quote tier so
 the market strip still fills (the name is matched flexibly — `ALPHA_VANTAGE_KEY`,
 `AV_KEY`, etc. all resolve). Note the service is public by default and the
@@ -275,5 +291,6 @@ universes/        diagnostics.yaml, fintech.yaml
 ## Out of scope (deliberately)
 
 No auth, no DB (the artifact is a JSON file), no hosted scheduler, no
-multi-user. One batched LLM call per run; everything else is deterministic
-Python.
+multi-user. Two LLM calls per run (Claude classification + the VeniceAI First
+Read narration), both fixed points in the DAG that only fill in content;
+everything else is deterministic Python.

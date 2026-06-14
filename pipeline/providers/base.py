@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel
 
-from pipeline.contracts import EmailReceipt, Quote, RawItem, UniverseConfig
+from pipeline.contracts import DailyBrief, EmailReceipt, Quote, RawItem, UniverseConfig
 from pipeline.contracts.universe import RSSFeed
 from pipeline.contracts.models import Classification
 
@@ -60,6 +60,29 @@ class ClassifierProvider(ABC):
 
     @abstractmethod
     def classify(self, items: list[RawItem], universe: UniverseConfig) -> ClassifierResult: ...
+
+
+class FirstReadResult(BaseModel):
+    """What the FirstReadProvider hands back to the orchestrator."""
+
+    text: str  # the narrative morning note (may be empty if nothing to say)
+    engine: str  # "venice" | "fixture" | "none" — provenance only
+
+
+class FirstReadProvider(ABC):
+    """Writes "today's First Read": a short narrative synthesis of the already
+    assembled brief (movers + top signals), the editorial lede that headlines
+    the email and a dashboard band.
+
+    Like the classifier, implementations must never raise on a bad model
+    response: validate, retry once, then fall back to the deterministic
+    composer. A run never crashes because of the LLM, and the LLM never decides
+    control flow — the brief is already assembled deterministically before this
+    runs; this only writes the prose over it.
+    """
+
+    @abstractmethod
+    def generate(self, brief: DailyBrief, universe: UniverseConfig) -> FirstReadResult: ...
 
 
 class EmailProvider(ABC):

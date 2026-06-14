@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Header } from "./components/Header";
 import { DataModeBanner } from "./components/DataModeBanner";
 import { TheRead } from "./components/TheRead";
+import { FirstRead } from "./components/FirstRead";
 import { MarketStrip } from "./components/MarketStrip";
 import { PrioritySignals } from "./components/PrioritySignals";
 import { ByCompany } from "./components/ByCompany";
@@ -144,6 +145,7 @@ export default function App() {
       />
       <DataModeBanner brief={brief} />
       <TheRead brief={brief} />
+      <FirstRead brief={brief} />
 
       <div className="mx-auto flex max-w-[1400px] flex-col gap-0 lg:flex-row lg:gap-6 lg:px-6">
         <main className="min-w-0 flex-1">
