@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import type { DailyBrief, Quote } from "../lib/contracts";
 import { fmtPct, fmtPrice } from "../lib/format";
 import { SectionHead } from "./bits";
+import { MoveBars } from "./MoveBars";
 
 export function MarketStrip({
   brief,
@@ -45,6 +46,14 @@ export function MarketStrip({
             />
           ))}
         </ul>
+      )}
+      {quotes.length > 0 && (
+        <MoveBars
+          brief={brief}
+          hoverTicker={hoverTicker}
+          hoverItemId={hoverItemId}
+          onHover={onHover}
+        />
       )}
     </section>
   );
