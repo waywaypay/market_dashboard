@@ -17,6 +17,7 @@ import { SectorHeadlines } from "./components/SectorHeadlines";
 import { RightRail } from "./components/RightRail";
 import { EmailModal } from "./components/EmailModal";
 import { WatchlistModal } from "./components/WatchlistModal";
+import { NewUniverseModal } from "./components/NewUniverseModal";
 import type { DailyBrief, Item, UniverseEntry } from "./lib/contracts";
 import { loadBrief, loadUniverses, refreshPipeline } from "./lib/loadBrief";
 import { useWatchlists } from "./lib/watchlists";
@@ -40,6 +41,7 @@ export default function App() {
   const [minMateriality, setMinMateriality] = useState(1);
   const [emailOpen, setEmailOpen] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [newUniverseOpen, setNewUniverseOpen] = useState(false);
 
   const fetchBrief = useCallback(async (universeId?: string) => {
     setRefreshing(true);
@@ -155,6 +157,7 @@ export default function App() {
         brief={brief}
         universes={universes}
         onSelectUniverse={(id) => void fetchBrief(id)}
+        onNewUniverse={() => setNewUniverseOpen(true)}
         watchlists={wl.watchlists}
         activeWatchlistId={wl.activeId}
         onSelectWatchlist={wl.setActiveId}
@@ -223,6 +226,21 @@ export default function App() {
           onSetActive={wl.setActiveId}
           onToggleTicker={wl.toggleTicker}
           onSetMembers={wl.setMembers}
+        />
+      )}
+      {newUniverseOpen && (
+        <NewUniverseModal
+          universes={universes}
+          onClose={() => setNewUniverseOpen(false)}
+          onCreated={async (id) => {
+            setNewUniverseOpen(false);
+            setUniverses(await loadUniverses());
+            await fetchBrief(id);
+          }}
+          onDeleted={async (id) => {
+            setUniverses(await loadUniverses());
+            if (id === brief.universe_id) await fetchBrief();
+          }}
         />
       )}
     </div>

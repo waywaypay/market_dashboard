@@ -41,12 +41,16 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import yaml
+
 REPO = Path(__file__).resolve().parents[1]
 DIST = REPO / "web" / "dist"
 PUBLIC = REPO / "web" / "public"
+UNIVERSES = REPO / "universes"
 ARTIFACT_PREFIXES = ("/brief.json", "/briefs/", "/universes.json")
 
 _refresh_lock = threading.Lock()
+_create_lock = threading.Lock()  # serialize on-demand universe builds
 
 # Last refresh outcome, served by /api/status and attached to artifact-miss
 # responses so the UI can say WHY there is no data yet instead of rendering
@@ -137,6 +141,78 @@ def refresh_artifacts() -> dict:
         return {"ok": False, "detail": detail}
     finally:
         _refresh_lock.release()
+
+
+def _valid_id(uid: str) -> bool:
+    return bool(uid) and ".." not in uid and "/" not in uid and (
+        uid.replace("-", "").replace("_", "").isalnum()
+    )
+
+
+def create_universe(payload: dict) -> dict:
+    """Build a user-defined universe from {label, subject_ticker, peer_tickers?,
+    sector_keywords?}: write its YAML to universes/ and run the pipeline once so
+    its brief exists immediately. Custom universes always pull real data (no
+    fixtures exist for arbitrary tickers); email is never sent."""
+    from pipeline.contracts.universe import discover_universes, load_universe
+    from pipeline.custom_universe import UniverseSpecError, build_spec
+    from pipeline.orchestrator import run_universe
+
+    with _create_lock:
+        try:
+            existing = {p.stem for p in discover_universes(UNIVERSES)}
+            spec = build_spec(payload, existing)
+        except UniverseSpecError as exc:
+            return {"ok": False, "detail": str(exc), "status": 400}
+        except Exception as exc:  # malformed payload shape
+            return {"ok": False, "detail": f"invalid request: {exc}", "status": 400}
+
+        UNIVERSES.mkdir(parents=True, exist_ok=True)
+        path = UNIVERSES / f"{spec['id']}.yaml"
+        path.write_text(
+            yaml.safe_dump(spec, sort_keys=False, allow_unicode=True), encoding="utf-8"
+        )
+        try:
+            run_universe(
+                load_universe(path),
+                now=datetime.now(timezone.utc),
+                web_public=PUBLIC,
+                default=False,  # a custom universe never takes over brief.json
+                send_email=False,
+            )
+        except Exception as exc:
+            traceback.print_exc()
+            path.unlink(missing_ok=True)  # don't leave a half-built universe behind
+            return {
+                "ok": False,
+                "detail": f"failed to build universe: {type(exc).__name__}: {exc}",
+                "status": 500,
+            }
+        return {
+            "ok": True,
+            "id": spec["id"],
+            "label": spec["label"],
+            "detail": f"created {spec['label']}",
+        }
+
+
+def delete_universe(uid: str) -> dict:
+    """Remove a user-created universe — its YAML, brief, and manifest entry.
+    Built-in universes (no `user-` prefix) are never deletable."""
+    if not _valid_id(uid) or not uid.startswith("user-"):
+        return {"ok": False, "detail": "only custom universes can be deleted", "status": 400}
+    with _create_lock:
+        (UNIVERSES / f"{uid}.yaml").unlink(missing_ok=True)
+        (PUBLIC / "briefs" / f"{uid}.json").unlink(missing_ok=True)
+        manifest_path = PUBLIC / "universes.json"
+        if manifest_path.exists():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest = [m for m in manifest if m.get("id") != uid]
+                manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            except json.JSONDecodeError:
+                pass
+    return {"ok": True, "detail": f"deleted {uid}"}
 
 
 def ensure_web_built() -> None:
@@ -296,13 +372,18 @@ class Handler(BaseHTTPRequestHandler):
             result = refresh_artifacts()
             self._send_json(200 if result["ok"] else 500, result)
             return
+        if self.path == "/api/universe":  # create a custom universe + build it
+            result = create_universe(self._read_json_body())
+            status = result.pop("status", 200 if result["ok"] else 500)
+            self._send_json(status, result)
+            return
+        if self.path == "/api/universe/delete":
+            result = delete_universe(str(self._read_json_body().get("id", "")))
+            status = result.pop("status", 200 if result["ok"] else 500)
+            self._send_json(status, result)
+            return
         if self.path == "/api/ship":
-            length = int(self.headers.get("Content-Length") or 0)
-            try:
-                payload = json.loads(self.rfile.read(length) or b"{}")
-                universe = str(payload.get("universe", ""))
-            except json.JSONDecodeError:
-                universe = ""
+            universe = str(self._read_json_body().get("universe", ""))
             if not universe.replace("-", "").replace("_", "").isalnum():
                 self._send_json(400, {"ok": False, "detail": "invalid universe id"})
                 return
@@ -312,6 +393,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200 if result["ok"] else 500, result)
             return
         self._send_json(404, {"ok": False, "detail": "unknown endpoint"})
+
+    def _read_json_body(self) -> dict:
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}")
+            return body if isinstance(body, dict) else {}
+        except (json.JSONDecodeError, ValueError):
+            return {}
 
     # -- plumbing ---------------------------------------------------------------
 

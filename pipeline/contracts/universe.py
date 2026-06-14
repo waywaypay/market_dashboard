@@ -56,6 +56,10 @@ class UniverseConfig(BaseModel):
     house_style: str
     thresholds: Thresholds = Thresholds()
     delivery: Delivery = Delivery()
+    # User-created universes (built in the UI) set this. They carry no fixtures,
+    # so the orchestrator runs them with real data providers + the keyless rules
+    # classifier; the web selector marks them deletable. Built-in YAMLs omit it.
+    custom: bool = False
 
     @field_validator("rss_feeds", mode="before")
     @classmethod

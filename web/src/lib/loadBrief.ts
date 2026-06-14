@@ -55,6 +55,53 @@ export async function refreshPipeline(): Promise<void> {
   }
 }
 
+export type NewUniverse = {
+  label: string;
+  subject_ticker: string;
+  subject_name?: string;
+  peer_tickers: string[];
+  sector_keywords: string[];
+};
+
+/** Create a custom universe and build its first brief (server runs the pipeline
+ * for the given tickers). Resolves with the new universe id on success. */
+export async function createUniverse(
+  spec: NewUniverse,
+): Promise<{ ok: boolean; id?: string; detail: string }> {
+  try {
+    const res = await fetch("/api/universe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(spec),
+    });
+    const body = await res.json();
+    return { ok: Boolean(body.ok), id: body.id, detail: String(body.detail ?? "") };
+  } catch {
+    return {
+      ok: false,
+      detail:
+        "Create endpoint unreachable — custom universes need the pipeline server (run `make serve`, or a deploy).",
+    };
+  }
+}
+
+/** Delete a custom universe (its config, brief, and selector entry). */
+export async function deleteUniverse(
+  universeId: string,
+): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const res = await fetch("/api/universe/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: universeId }),
+    });
+    const body = await res.json();
+    return { ok: Boolean(body.ok), detail: String(body.detail ?? "") };
+  } catch {
+    return { ok: false, detail: "Delete endpoint unreachable." };
+  }
+}
+
 export async function shipFirstRead(
   universeId: string,
 ): Promise<{ ok: boolean; detail: string }> {

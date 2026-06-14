@@ -89,7 +89,9 @@ def assemble_brief(
     )
 
 
-def write_artifacts(brief: DailyBrief, web_public: str | Path, default: bool) -> list[Path]:
+def write_artifacts(
+    brief: DailyBrief, web_public: str | Path, default: bool, custom: bool = False
+) -> list[Path]:
     """Write briefs/<id>.json (+ brief.json for the default universe) and
     refresh the universes.json manifest the dashboard's selector reads."""
     public = Path(web_public)
@@ -116,6 +118,7 @@ def write_artifacts(brief: DailyBrief, web_public: str | Path, default: bool) ->
         "label": brief.universe_label,
         "subject_ticker": brief.subject_ticker,
         "subject_name": brief.subject_name,
+        "custom": custom,  # user-created universes are deletable from the selector
     }
     manifest = [m for m in manifest if m.get("id") != brief.universe_id] + [entry]
     manifest.sort(key=lambda m: m["id"])
