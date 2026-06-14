@@ -76,7 +76,7 @@ Every external dependency sits behind a typed interface in
 | `RSSProvider`        | synthetic feed items               | **`HttpRSSProvider` (working)** — feed URLs in the YAML   |
 | `EdgarProvider`      | synthetic 8-Ks                     | **`SecEdgarProvider` (working)** — free SEC submissions API|
 | `NewsProvider`       | synthetic search results           | **`ExaNewsProvider` (working)** — Exa semantic news search|
-| `QuoteProvider`      | seeded pre-market snapshot         | **Yahoo → Stooq → Alpha Vantage chain (working)** — keyless, self-healing (keyed last resort) |
+| `QuoteProvider`      | seeded pre-market snapshot         | **Yahoo → Stooq → FMP → Finnhub → Alpha Vantage chain (working)** — keyless first, keyed tiers when their keys are set |
 | `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)                   |
 | `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                         |
 
@@ -93,7 +93,11 @@ rendered in the rail), not crashes.
 export SEC_EDGAR_USER_AGENT="yourapp/1.0 you@example.com"  # SEC fair-access policy
 export EXA_API_KEY="..."                                   # https://exa.ai
 export ANTHROPIC_API_KEY="..."                             # real classification
-export ALPHAVANTAGE_API_KEY="..."                          # optional: keyed quote fallback
+# optional keyed quote tiers (any one suffices; they answer from cloud IPs the
+# keyless vendors get blocked on):
+export FMP_KEY="..."                                       # financialmodelingprep.com (batched, RVOL)
+export FINNHUB_KEY="..."                                   # finnhub.io (60 req/min)
+export ALPHAVANTAGE_API_KEY="..."                          # alphavantage.co (25 req/day)
 
 BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
 ```
@@ -133,12 +137,20 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   paced with capped, `Retry-After`-honoring backoff and a hard time budget
   (`QUOTES_DEADLINE_S`, default 120s). RVOL and unusual-move flags stay
   derived in the fuse stage. When both keyless tiers are blocked at the host
-  IP (some cloud egress IPs are banned by Yahoo *and* Stooq), set
-  `ALPHAVANTAGE_API_KEY` to add a keyed last-resort tier (`GLOBAL_QUOTE`,
-  last price + close move). Its free tier is strict (25 req/day, 5/min), so
-  results are cached per ticker for `ALPHAVANTAGE_TTL_S` (default 12h) and
-  quota notices abort the batch — fine for "as of close", thin for live
-  intraday.
+  IP (some cloud egress IPs are banned by Yahoo *and* Stooq), set a **keyed
+  tier** — these answer from datacenter IPs the keyless vendors reject. Any
+  one suffices; when several keys are present they chain in this order:
+  **FMP** (`FMP_KEY`; one batched call prices the whole universe with price,
+  previous close, volume *and* average volume, so it yields RVOL — free tier
+  250 req/day), then **Finnhub** (`FINNHUB_KEY`; per-ticker price + close
+  move, generous 60 req/min, no volume), then **Alpha Vantage**
+  (`ALPHAVANTAGE_API_KEY`; `GLOBAL_QUOTE`, last price + close move, strict 25
+  req/day so results cache per ticker for `ALPHAVANTAGE_TTL_S`, default 12h,
+  and quota notices abort the batch). Keys are matched by *normalized* env-var
+  name (`FINHUB_KEY`, `FMP_API_KEY`, … all resolve), since a near-miss name is
+  the easiest way to silently get an empty strip. Each keyed tier honors the
+  same as-of-close/flat-pre-market rule; none carries trailing history, so
+  `sigma` falls back to a conservative default.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 

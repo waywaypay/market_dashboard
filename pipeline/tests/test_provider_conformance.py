@@ -31,6 +31,8 @@ from pipeline.providers.fixture import (
 from pipeline.providers.edgar import SecEdgarProvider
 from pipeline.providers.exa_news import ExaNewsProvider
 from pipeline.providers.fallback import FallbackQuoteProvider
+from pipeline.providers.fmp_quotes import FmpQuoteProvider
+from pipeline.providers.finnhub_quotes import FinnhubQuoteProvider
 from pipeline.providers.real_stubs import SmtpEmailProvider
 from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.stooq_quotes import StooqQuoteProvider
@@ -55,6 +57,8 @@ def test_real_providers_subclass_interfaces() -> None:
     assert issubclass(ExaNewsProvider, NewsProvider)
     assert issubclass(YahooQuoteProvider, QuoteProvider)
     assert issubclass(StooqQuoteProvider, QuoteProvider)
+    assert issubclass(FmpQuoteProvider, QuoteProvider)
+    assert issubclass(FinnhubQuoteProvider, QuoteProvider)
     assert issubclass(FallbackQuoteProvider, QuoteProvider)
     # remaining stub still satisfies the interface (vendor TBD)
     assert issubclass(SmtpEmailProvider, EmailProvider)

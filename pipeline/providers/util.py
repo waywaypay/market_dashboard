@@ -70,6 +70,18 @@ def infer_ticker(text: str, companies: dict[str, str]) -> str | None:
     return sorted(hits, key=lambda h: (-h[0], h[1]))[0][1]
 
 
+def match_api_key(canonical_names: set[str]) -> str | None:
+    """First env var whose NORMALIZED name (upper-cased, separators stripped) is
+    in `canonical_names`, else None. Matching by normalized name means a key set
+    under any reasonable spelling resolves the same — a near-miss like FINHUB_KEY
+    vs FINNHUB_API_KEY is the easiest way to silently get an empty strip, so we
+    accept them all. `canonical_names` must already be normalized."""
+    for name, value in os.environ.items():
+        if value and re.sub(r"[^A-Z0-9]", "", name.upper()) in canonical_names:
+            return value.strip()
+    return None
+
+
 def parse_iso(value: str | None) -> datetime | None:
     """Tolerant ISO-8601 parse; returns aware UTC datetimes."""
     if not value:

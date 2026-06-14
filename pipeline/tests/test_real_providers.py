@@ -22,7 +22,11 @@ from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.util import infer_ticker, strip_tags
 from pipeline.providers import stooq_quotes
 from pipeline.providers import alphavantage_quotes
+from pipeline.providers import fmp_quotes
+from pipeline.providers import finnhub_quotes
 from pipeline.providers.alphavantage_quotes import AlphaVantageQuoteProvider
+from pipeline.providers.fmp_quotes import FmpQuoteProvider
+from pipeline.providers.finnhub_quotes import FinnhubQuoteProvider
 from pipeline.providers.fallback import FallbackQuoteProvider
 from pipeline.providers.stooq_quotes import StooqQuoteProvider
 from pipeline.providers.yahoo_quotes import (
@@ -978,6 +982,180 @@ def test_alphavantage_skips_unknown_symbol_and_caches_the_miss() -> None:
     with pytest.raises(RuntimeError, match="no usable quotes"):
         again.snapshot(["ZZZZ"])
     assert calls["n"] == 1  # the miss was cached
+
+
+# ----------------------------------------------------------- FMP (keyed, batched)
+
+FMP_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))  # Sat
+FMP_PREMARKET_NOW = datetime(2026, 6, 10, 8, 0, tzinfo=ZoneInfo("America/New_York"))  # Wed 08:00 ET
+FMP_FRIDAY_TS = int(datetime(2026, 6, 12, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+FMP_TUESDAY_TS = int(datetime(2026, 6, 9, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+
+
+def _fmp_row(symbol, price, prev, ts, volume=412000, avg=1_000_000) -> dict:
+    return {
+        "symbol": symbol,
+        "name": f"{symbol} Inc.",
+        "price": price,
+        "previousClose": prev,
+        "volume": volume,
+        "avgVolume": avg,
+        "timestamp": ts,
+    }
+
+
+def _fmp_handler(rows: dict[str, dict]):
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert "financialmodelingprep.com" in req.url.host
+        assert dict(req.url.params)["apikey"] == "fmp-test"
+        requested = req.url.path.rsplit("/", 1)[-1].upper().split(",")  # batched in the path
+        return httpx.Response(200, json=[rows[s] for s in requested if s in rows])
+
+    return handler
+
+
+def test_fmp_prices_batch_with_rvol_inputs() -> None:
+    rows = {
+        "VCYT": _fmp_row("VCYT", 111.3, 106.0, FMP_FRIDAY_TS),
+        "NTRA": _fmp_row("NTRA", 168.42, 170.0, FMP_FRIDAY_TS, volume=900000, avg=1_800_000),
+    }
+    provider = FmpQuoteProvider(
+        companies=COMPANIES,
+        api_key="fmp-test",
+        now=FMP_WEEKEND_NOW,
+        transport=httpx.MockTransport(_fmp_handler(rows)),
+    )
+    by = {q.ticker: q for q in provider.snapshot(["VCYT", "NTRA"])}
+    # weekend -> show the last session's close, its move and volume
+    assert by["VCYT"].name == "Veracyte" and by["VCYT"].last == 111.3
+    assert by["VCYT"].chg_pct == 5.0  # 111.3 vs previous close 106.0
+    # unlike the other keyed tiers, FMP carries volume + avg_volume -> RVOL
+    assert by["VCYT"].volume == 412000 and by["VCYT"].avg_volume == 1_000_000
+    assert by["VCYT"].sigma == fmp_quotes.DEFAULT_SIGMA
+    assert by["NTRA"].chg_pct == round((168.42 / 170.0 - 1) * 100, 2)
+
+
+def test_fmp_stays_flat_during_premarket() -> None:
+    # Wed pre-market, data stamped the prior session -> flat, no volume; but the
+    # trailing average still rides along so RVOL stays available.
+    rows = {"VCYT": _fmp_row("VCYT", 111.3, 106.0, FMP_TUESDAY_TS)}
+    provider = FmpQuoteProvider(
+        companies=COMPANIES,
+        api_key="fmp-test",
+        now=FMP_PREMARKET_NOW,
+        transport=httpx.MockTransport(_fmp_handler(rows)),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 111.3 and q.chg_pct == 0.0 and q.volume == 0
+    assert q.avg_volume == 1_000_000
+
+
+def test_fmp_surfaces_an_error_body() -> None:
+    # FMP returns plan/limit errors as a JSON object, not the success array.
+    provider = FmpQuoteProvider(
+        companies=COMPANIES,
+        api_key="bogus",
+        now=FMP_WEEKEND_NOW,
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(200, json={"Error Message": "Limit Reach. Upgrade."})
+        ),
+    )
+    with pytest.raises(RuntimeError, match="FMP rejected"):
+        provider.snapshot(["VCYT"])
+
+
+def test_fmp_reads_key_from_env_name_variants(monkeypatch) -> None:
+    for name in ("FMP_KEY", "FMP_API_KEY", "FINANCIALMODELINGPREP_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FMP_KEY", "k")  # the spelling set in prod
+    assert FmpQuoteProvider(companies=COMPANIES).api_key == "k"
+
+
+# ---------------------------------------------------- Finnhub (keyed, per-ticker)
+
+FINNHUB_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))
+FINNHUB_PREMARKET_NOW = datetime(2026, 6, 10, 8, 0, tzinfo=ZoneInfo("America/New_York"))
+FINNHUB_FRIDAY_TS = int(datetime(2026, 6, 12, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+FINNHUB_TUESDAY_TS = int(datetime(2026, 6, 9, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+
+
+def _finnhub_handler(price=111.3, prev=106.0, ts=FINNHUB_FRIDAY_TS):
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert "finnhub.io" in req.url.host
+        params = dict(req.url.params)
+        assert params["token"] == "fh-test"
+        if params["symbol"] == "ZZZZ":  # unknown symbol -> all-zeros body
+            return httpx.Response(200, json={"c": 0, "d": None, "dp": None, "pc": 0, "t": 0})
+        return httpx.Response(
+            200,
+            json={"c": price, "d": price - prev, "dp": 5.0, "h": price, "l": prev, "o": prev, "pc": prev, "t": ts},
+        )
+
+    return handler
+
+
+def test_finnhub_prices_as_of_close_with_session_move() -> None:
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_WEEKEND_NOW,
+        transport=httpx.MockTransport(_finnhub_handler()),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.name == "Veracyte" and q.last == 111.3 and q.chg_pct == 5.0
+    assert q.volume == 0 and q.avg_volume == 0  # /quote has no volume
+    assert q.sigma == finnhub_quotes.DEFAULT_SIGMA
+
+
+def test_finnhub_stays_flat_during_premarket() -> None:
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_PREMARKET_NOW,
+        transport=httpx.MockTransport(_finnhub_handler(ts=FINNHUB_TUESDAY_TS)),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 111.3 and q.chg_pct == 0.0  # never yesterday's move pre-open
+
+
+def test_finnhub_skips_unknown_symbol() -> None:
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_WEEKEND_NOW,
+        transport=httpx.MockTransport(_finnhub_handler()),
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["ZZZZ"])
+
+
+def test_finnhub_rate_limit_aborts_the_batch() -> None:
+    calls = {"n": 0}
+
+    def throttled(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(429, json={"error": "API limit reached"})
+
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_WEEKEND_NOW,
+        transport=httpx.MockTransport(throttled),
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["VCYT", "NTRA", "GH"])
+    assert calls["n"] == 1  # stopped after the first 429 — spared the key
+
+
+def test_finnhub_reads_key_from_env_name_variants(monkeypatch) -> None:
+    for name in ("FINNHUB_KEY", "FINHUB_KEY", "FINNHUB_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FINHUB_KEY", "k")  # the (mis)spelling set in prod
+    assert FinnhubQuoteProvider(companies=COMPANIES).api_key == "k"
 
 
 # ------------------------------------------------------------- quote vendor chain
