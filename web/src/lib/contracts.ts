@@ -86,6 +86,11 @@ export const dailyBriefSchema = z.object({
   // historical daily closes per ticker for the overlay chart; best-effort, so
   // older/degraded artifacts (no history source) simply default to empty
   history: z.record(z.string(), z.array(pricePointSchema)).default({}),
+  // "Today's First Read": the narrative morning note (VeniceAI when keyed, else
+  // a deterministic composer). Optional + defaulted so older artifacts validate;
+  // empty means no note this run and the UI/email fall back to `tldr`.
+  first_read: z.string().default(""),
+  first_read_engine: z.string().default("none"),
 });
 
 export const universeEntrySchema = z.object({

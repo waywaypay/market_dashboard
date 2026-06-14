@@ -10,9 +10,11 @@
 # Yahoo Finance quotes. Two sources need secrets set in the Render
 # dashboard to light up — EXA_API_KEY (news search; reports "failed" in
 # the rail until set) and ANTHROPIC_API_KEY (Claude classification; falls
-# back to rule-based tagging until set). Set SEC_EDGAR_USER_AGENT to your
-# contact info per SEC fair-access policy. Email transport has no real
-# vendor yet and stays on fixtures.
+# back to rule-based tagging until set). VENICE_API_KEY is optional: today's
+# First Read is narrated by a deterministic composer until it is set, then by
+# the VeniceAI API. Set SEC_EDGAR_USER_AGENT to your contact info per SEC
+# fair-access policy. Email transport has no real vendor yet and stays on
+# fixtures.
 
 services:
   - type: web
@@ -41,6 +43,8 @@ services:
         sync: false # set in dashboard
       - key: ANTHROPIC_API_KEY
         sync: false # set in dashboard (enables the real classifier via BRIEF_CLASSIFIER=auto)
+      - key: VENICE_API_KEY
+        sync: false # set in dashboard (narrates today's First Read via BRIEF_FIRST_READ=auto)
       # Optional keyed quote tiers. Yahoo + Stooq are keyless, but a shared
       # cloud egress IP is often blocked by both; a keyed tier answers from
       # those IPs. Any one is enough (chain order FMP -> Finnhub -> AV).

@@ -16,7 +16,7 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pipeline.contracts import EmailReceipt, Quote, RawItem, UniverseConfig
+from pipeline.contracts import DailyBrief, EmailReceipt, Quote, RawItem, UniverseConfig
 from pipeline.contracts.models import Classification
 from pipeline.contracts.universe import RSSFeed
 from pipeline.providers import rules
@@ -25,6 +25,8 @@ from pipeline.providers.base import (
     ClassifierResult,
     EdgarProvider,
     EmailProvider,
+    FirstReadProvider,
+    FirstReadResult,
     NewsProvider,
     QuoteProvider,
     RSSProvider,
@@ -158,6 +160,49 @@ def compose_tldr_fallback(classifications: list[Classification], universe: Unive
     )
     lead = top.summary.rstrip(".")
     return f"{lead}. Also hot: {names}." if names else f"{lead}."
+
+
+def compose_first_read(brief: DailyBrief) -> str:
+    """Deterministic narrative morning note when no LLM is available.
+
+    Reads off the already-assembled brief (the same object the dashboard
+    renders), so it can never headline anything the brief doesn't carry. Built
+    from the flagged movers and the top priority signals rather than echoing
+    `tldr`, so it reads as a distinct note next to The Read band.
+    """
+    movers = [q for q in brief.market if q.flagged]
+    parts: list[str] = []
+    if movers:
+        moves = ", ".join(f"{q.ticker} {q.chg_pct:+.1f}%" for q in movers[:4])
+        verb = "is" if len(movers) == 1 else "are"
+        parts.append(
+            f"Pre-market, {moves} {verb} moving on unusual volume — "
+            "the moves to explain before the bell."
+        )
+    else:
+        parts.append(
+            "The tape is calm pre-market: no unusual moves are flagged across the set."
+        )
+    top = brief.priority_signals[:2]
+    if top:
+        bites = "; ".join(
+            f"{(s.company or s.ticker or 'Sector')} — {s.summary.strip().rstrip('.')}"
+            for s in top
+        )
+        parts.append(f"Leading the read: {bites}.")
+    parts.append(
+        f"{brief.counts.total_items} items cleared the floor "
+        f"({brief.counts.hot_items} hot) ahead of the open."
+    )
+    return " ".join(parts)
+
+
+class FixtureFirstReadProvider(FirstReadProvider):
+    """Keyless reference implementation of the First Read contract, and the
+    fallback the Venice provider drops to when its call fails."""
+
+    def generate(self, brief: DailyBrief, universe: UniverseConfig) -> FirstReadResult:
+        return FirstReadResult(text=compose_first_read(brief), engine="fixture")
 
 
 class FixtureEmailProvider(EmailProvider):

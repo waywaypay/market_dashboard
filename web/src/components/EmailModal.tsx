@@ -72,7 +72,7 @@ export function EmailModal({ brief, onClose }: { brief: DailyBrief; onClose: () 
                 {brief.counts.total_items} items · {brief.counts.hot_items} hot
               </div>
               <p className="mt-2.5 font-display text-[15px] leading-snug text-white">
-                {brief.tldr}
+                {brief.first_read?.trim() || brief.tldr}
               </p>
             </div>
             <EmailSection

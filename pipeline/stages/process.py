@@ -1,9 +1,12 @@
-"""Process stage: the only LLM touchpoint in the pipeline.
+"""Process stage: the classification LLM touchpoint in the pipeline.
 
 (items, universe, classifier) -> ProcessResult. The classifier provider owns
 its own failure handling (retry once -> rule-based fallback), so this stage
 is total: it always returns typed Items. Items below the configured
 materiality floor are dropped here.
+
+(The other LLM touchpoint is the First Read narration, which runs after the
+brief is assembled — see the orchestrator and providers/venice_first_read.py.)
 """
 
 from __future__ import annotations

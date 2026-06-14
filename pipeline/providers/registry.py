@@ -6,6 +6,7 @@
     BRIEF_RSS / BRIEF_EDGAR / BRIEF_NEWS / BRIEF_QUOTES / BRIEF_EMAIL
                      fixture | real               — per-provider override
     BRIEF_CLASSIFIER auto (default) | fixture | rules | anthropic
+    BRIEF_FIRST_READ auto (default) | fixture | venice
 
 Real implementations exist for RSS (feed URLs in the universe YAML), EDGAR
 (free; set SEC_EDGAR_USER_AGENT per SEC fair-access policy), news search
@@ -16,7 +17,8 @@ transport is still a stub — keep it on fixtures while running real data:
 
 "auto" classification uses Anthropic when ANTHROPIC_API_KEY is set and the SDK
 is installed, otherwise the fixture classifier — so the project always runs
-with zero keys and upgrades itself when keys appear.
+with zero keys and upgrades itself when keys appear. "auto" First Read uses the
+VeniceAI API when VENICE_API_KEY is set, otherwise the deterministic composer.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ from pipeline.providers.base import (
     ClassifierProvider,
     EdgarProvider,
     EmailProvider,
+    FirstReadProvider,
     NewsProvider,
     QuoteProvider,
     RSSProvider,
@@ -40,6 +43,7 @@ from pipeline.providers.fixture import (
     FixtureClassifierProvider,
     FixtureEdgarProvider,
     FixtureEmailProvider,
+    FixtureFirstReadProvider,
     FixtureNewsProvider,
     FixtureQuoteProvider,
     FixtureRSSProvider,
@@ -56,6 +60,7 @@ class ProviderSet:
     news: NewsProvider
     quotes: QuoteProvider
     classifier: ClassifierProvider
+    first_read: FirstReadProvider
     email: EmailProvider
     # source -> "fixture"|"real", recorded at build time so the brief can
     # carry its own provenance (DailyBrief.data_mode / provider_modes)
@@ -81,6 +86,21 @@ def build_classifier(universe_id: str) -> ClassifierProvider:
     if mode == "fixture":
         return FixtureClassifierProvider(universe_id)
     raise ValueError(f"Unknown BRIEF_CLASSIFIER={mode!r}")
+
+
+def build_first_read() -> FirstReadProvider:
+    mode = os.environ.get("BRIEF_FIRST_READ", "auto").lower()
+    if mode == "auto":
+        from pipeline.providers.venice_first_read import api_key_from_env
+
+        mode = "venice" if api_key_from_env() else "fixture"
+    if mode == "venice":
+        from pipeline.providers.venice_first_read import VeniceFirstReadProvider
+
+        return VeniceFirstReadProvider()
+    if mode == "fixture":
+        return FixtureFirstReadProvider()
+    raise ValueError(f"Unknown BRIEF_FIRST_READ={mode!r}")
 
 
 def _mode(name: str) -> str:
@@ -162,6 +182,7 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
         news=_pick("NEWS", lambda: FixtureNewsProvider(uid, now), real_news),
         quotes=_pick("QUOTES", lambda: FixtureQuoteProvider(uid, now), real_quotes),
         classifier=build_classifier(uid),
+        first_read=build_first_read(),
         email=_pick("EMAIL", lambda: FixtureEmailProvider(), real_email),
         modes={name.lower(): _mode(name) for name in ("RSS", "EDGAR", "NEWS", "QUOTES", "EMAIL")},
     )

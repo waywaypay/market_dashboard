@@ -113,6 +113,15 @@ def render_email(brief: DailyBrief) -> str:
             f"&#9888;&#xFE0E; {label} — fixture providers, not live market data.</span></td></tr>"
         )
 
+    # The narrative First Read is the lede when present; older/keyless artifacts
+    # without one fall back to the one-line tldr (which is otherwise untouched).
+    lede = brief.first_read.strip() or brief.tldr
+    first_read_note = (
+        f" · first read: {escape(brief.first_read_engine)}"
+        if brief.first_read.strip()
+        else ""
+    )
+
     movers = [q for q in brief.market if q.flagged]
     movers_line = " &nbsp;·&nbsp; ".join(
         f'<span style="font-family:{_MONO};color:{UP if q.chg_pct >= 0 else DOWN};">'
@@ -135,7 +144,7 @@ def render_email(brief: DailyBrief) -> str:
     <div style="font-family:{_BODY};font-size:13px;color:#98A2B3;margin-top:4px;">{date_str}
       &nbsp;·&nbsp; <span style="font-family:{_MONO};">{brief.counts.total_items} items · {brief.counts.hot_items} hot</span></div>
     <div style="font-family:Georgia,serif;font-size:17px;line-height:25px;color:#FFFFFF;margin-top:12px;">
-      {escape(brief.tldr)}</div>
+      {escape(lede)}</div>
     {f'<div style="margin-top:10px;font-size:13px;">{movers_line}</div>' if movers_line else ""}
   </td></tr>
   {provenance_banner}
@@ -146,7 +155,7 @@ def render_email(brief: DailyBrief) -> str:
   <tr><td style="padding:20px 24px;background:{SURFACE};border-top:1px solid {HAIRLINE};">
     <div style="font-family:{_BODY};font-size:11px;color:#98A2B3;line-height:17px;">
       Generated {_fmt_time(brief.generated_at, brief.display_tz)} · market opens
-      {_fmt_time(brief.market_open_at, brief.display_tz)} · classifier: {escape(brief.classifier_engine)} · data: {escape(brief.data_mode)}.<br>
+      {_fmt_time(brief.market_open_at, brief.display_tz)} · classifier: {escape(brief.classifier_engine)}{first_read_note} · data: {escape(brief.data_mode)}.<br>
       Rendered from the same artifact as the dashboard — they never disagree.</div>
   </td></tr>
 </table>
