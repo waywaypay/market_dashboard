@@ -22,7 +22,7 @@ from pipeline.contracts import DailyBrief, UniverseConfig
 from pipeline.contracts.universe import discover_universes, load_universe
 from pipeline.email_render import email_subject, render_email
 from pipeline.market_hours import next_market_open
-from pipeline.providers.registry import ProviderSet, build_providers
+from pipeline.providers.registry import ProviderSet, build_custom_providers, build_providers
 from pipeline.stages.fuse import run_fuse
 from pipeline.stages.output import assemble_brief, write_artifacts
 from pipeline.stages.process import run_process
@@ -37,7 +37,13 @@ def run_universe(
     providers: ProviderSet | None = None,
     send_email: bool = True,
 ) -> DailyBrief:
-    providers = providers or build_providers(universe, now)
+    if providers is None:
+        # Custom (user-created) universes have no fixtures — always real data.
+        providers = (
+            build_custom_providers(universe, now)
+            if universe.custom
+            else build_providers(universe, now)
+        )
 
     src = run_source(universe, providers, now)
     proc = run_process(src.items, universe, providers.classifier)
@@ -55,7 +61,7 @@ def run_universe(
         provider_modes=providers.modes,
     )
 
-    written = write_artifacts(brief, web_public, default=default)
+    written = write_artifacts(brief, web_public, default=default, custom=universe.custom)
     receipt_note = "email skipped"
     if send_email:
         try:

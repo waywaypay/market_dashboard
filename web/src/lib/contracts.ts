@@ -85,6 +85,9 @@ export const universeEntrySchema = z.object({
   label: z.string(),
   subject_ticker: z.string(),
   subject_name: z.string(),
+  // user-created universes (built in the UI) are deletable; built-ins are not.
+  // Optional + defaulted so older manifests still validate.
+  custom: z.boolean().default(false),
 });
 
 export type Quote = z.infer<typeof quoteSchema>;

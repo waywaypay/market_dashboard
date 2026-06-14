@@ -112,73 +112,102 @@ def _pick(name: str, fixture: Callable[[], T], real: Callable[[], T]) -> T:
     return fixture() if _mode(name) == "fixture" else real()
 
 
+# -- real data providers (shared by the env-driven and custom-universe paths) --
+
+
+def _real_rss(universe: UniverseConfig) -> RSSProvider:
+    from pipeline.providers.rss import HttpRSSProvider
+
+    return HttpRSSProvider(companies=universe.companies)
+
+
+def _real_edgar() -> EdgarProvider:
+    from pipeline.providers.edgar import SecEdgarProvider
+
+    return SecEdgarProvider()
+
+
+def _real_news(universe: UniverseConfig) -> NewsProvider:
+    from pipeline.providers.exa_news import ExaNewsProvider
+
+    return ExaNewsProvider(companies=universe.companies, watch=universe.private_watch)
+
+
+def _real_quotes(universe: UniverseConfig, now: datetime) -> QuoteProvider:
+    from pipeline.providers.fallback import FallbackQuoteProvider
+    from pipeline.providers.stooq_quotes import StooqQuoteProvider
+    from pipeline.providers.yahoo_quotes import YahooQuoteProvider
+
+    # Yahoo first (pre-market tape); Stooq is the keyless real-data fallback for
+    # when Yahoo rate-limits the host's shared egress IP. Stooq takes the run
+    # clock so its as-of-close move tracks `now`.
+    chain: list[QuoteProvider] = [
+        YahooQuoteProvider(companies=universe.companies),
+        StooqQuoteProvider(companies=universe.companies, now=now),
+    ]
+    # Keyed tiers that answer from cloud IPs the keyless vendors get blocked on.
+    # Each only joins the chain when its key is present (matched by normalized
+    # env-var name). Ordered by data richness then budget: FMP (batched, carries
+    # volume -> RVOL, 250/day), Finnhub (price only, 60/min), Alpha Vantage
+    # (price only, 25/day — the tiny last resort).
+    from pipeline.providers.fmp_quotes import (
+        FmpQuoteProvider,
+        api_key_from_env as fmp_key,
+    )
+    from pipeline.providers.finnhub_quotes import (
+        FinnhubQuoteProvider,
+        api_key_from_env as finnhub_key,
+    )
+    from pipeline.providers.alphavantage_quotes import (
+        AlphaVantageQuoteProvider,
+        api_key_from_env as alphavantage_key,
+    )
+
+    if fmp_key():
+        chain.append(FmpQuoteProvider(companies=universe.companies, now=now))
+    if finnhub_key():
+        chain.append(FinnhubQuoteProvider(companies=universe.companies, now=now))
+    if alphavantage_key():
+        chain.append(AlphaVantageQuoteProvider(companies=universe.companies, now=now))
+    return FallbackQuoteProvider(*chain)
+
+
+def _real_email() -> EmailProvider:
+    from pipeline.providers.real_stubs import SmtpEmailProvider
+
+    return SmtpEmailProvider()
+
+
 def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
     uid = universe.id
-
-    def real_rss() -> RSSProvider:
-        from pipeline.providers.rss import HttpRSSProvider
-
-        return HttpRSSProvider(companies=universe.companies)
-
-    def real_edgar() -> EdgarProvider:
-        from pipeline.providers.edgar import SecEdgarProvider
-
-        return SecEdgarProvider()
-
-    def real_news() -> NewsProvider:
-        from pipeline.providers.exa_news import ExaNewsProvider
-
-        return ExaNewsProvider(companies=universe.companies, watch=universe.private_watch)
-
-    def real_quotes() -> QuoteProvider:
-        from pipeline.providers.fallback import FallbackQuoteProvider
-        from pipeline.providers.stooq_quotes import StooqQuoteProvider
-        from pipeline.providers.yahoo_quotes import YahooQuoteProvider
-
-        # Yahoo first (pre-market tape); Stooq is the keyless real-data
-        # fallback for when Yahoo rate-limits the host's shared egress IP.
-        # Stooq takes the run clock so its as-of-close move tracks `now`.
-        chain: list[QuoteProvider] = [
-            YahooQuoteProvider(companies=universe.companies),
-            StooqQuoteProvider(companies=universe.companies, now=now),
-        ]
-        # Keyed tiers that answer from cloud IPs the keyless vendors get blocked
-        # on. Each only joins the chain when its key is present (matched by
-        # normalized env-var name). Ordered by data richness then budget:
-        # FMP (batched, carries volume -> RVOL, 250/day), Finnhub (price only,
-        # 60/min), Alpha Vantage (price only, 25/day — the tiny last resort).
-        from pipeline.providers.fmp_quotes import (
-            FmpQuoteProvider,
-            api_key_from_env as fmp_key,
-        )
-        from pipeline.providers.finnhub_quotes import (
-            FinnhubQuoteProvider,
-            api_key_from_env as finnhub_key,
-        )
-        from pipeline.providers.alphavantage_quotes import (
-            AlphaVantageQuoteProvider,
-            api_key_from_env as alphavantage_key,
-        )
-
-        if fmp_key():
-            chain.append(FmpQuoteProvider(companies=universe.companies, now=now))
-        if finnhub_key():
-            chain.append(FinnhubQuoteProvider(companies=universe.companies, now=now))
-        if alphavantage_key():
-            chain.append(AlphaVantageQuoteProvider(companies=universe.companies, now=now))
-        return FallbackQuoteProvider(*chain)
-
-    def real_email() -> EmailProvider:
-        from pipeline.providers.real_stubs import SmtpEmailProvider
-
-        return SmtpEmailProvider()
-
     return ProviderSet(
-        rss=_pick("RSS", lambda: FixtureRSSProvider(uid, now), real_rss),
-        edgar=_pick("EDGAR", lambda: FixtureEdgarProvider(uid, now), real_edgar),
-        news=_pick("NEWS", lambda: FixtureNewsProvider(uid, now), real_news),
-        quotes=_pick("QUOTES", lambda: FixtureQuoteProvider(uid, now), real_quotes),
+        rss=_pick("RSS", lambda: FixtureRSSProvider(uid, now), lambda: _real_rss(universe)),
+        edgar=_pick("EDGAR", lambda: FixtureEdgarProvider(uid, now), _real_edgar),
+        news=_pick("NEWS", lambda: FixtureNewsProvider(uid, now), lambda: _real_news(universe)),
+        quotes=_pick(
+            "QUOTES", lambda: FixtureQuoteProvider(uid, now), lambda: _real_quotes(universe, now)
+        ),
         classifier=build_classifier(uid),
-        email=_pick("EMAIL", lambda: FixtureEmailProvider(), real_email),
+        email=_pick("EMAIL", lambda: FixtureEmailProvider(), _real_email),
         modes={name.lower(): _mode(name) for name in ("RSS", "EDGAR", "NEWS", "QUOTES", "EMAIL")},
+    )
+
+
+def build_custom_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
+    """Providers for a user-created universe. Fixtures can only exist for the
+    seeded universes, so a custom one always pulls REAL data for its tickers,
+    and falls back to the keyless RULES classifier when no LLM key is set (the
+    fixture classifier needs per-universe canned files a custom universe lacks).
+    Provider failures still surface as SourceHealth, never crashes."""
+    classifier = build_classifier(universe.id)
+    if isinstance(classifier, FixtureClassifierProvider):
+        classifier = RulesClassifierProvider()
+    return ProviderSet(
+        rss=_real_rss(universe),
+        edgar=_real_edgar(),
+        news=_real_news(universe),
+        quotes=_real_quotes(universe, now),
+        classifier=classifier,
+        email=FixtureEmailProvider(),
+        modes={"rss": "real", "edgar": "real", "news": "real", "quotes": "real", "email": "fixture"},
     )

@@ -176,6 +176,21 @@ presentation (subject pinning, category colors by taxonomy order, display tz),
 and email recipients. Add a sector by adding a YAML file — no code changes.
 See `universes/diagnostics.yaml` for the annotated reference.
 
+**Custom universes from the UI.** You don't have to hand-write a YAML: the
+dashboard's universe selector has a **＋ New universe…** entry that opens a form
+(name, subject ticker, peer tickers, optional sector keywords). `POST
+/api/universe` builds a universe config, writes it to `universes/`, and runs the
+pipeline once so its brief exists immediately; **`POST /api/universe/delete`**
+removes a custom one (built-ins are not deletable). Custom universes carry no
+fixtures, so they always pull **real data** for their tickers (keyless quotes +
+EDGAR; news needs `EXA_API_KEY`) and classify with the keyless **rules** engine
+when no LLM key is set — they never crash a run, sources just surface as
+`SourceHealth`. They're marked `custom: true` and prefixed `user-` so one never
+becomes the default brief. True to the no-database design, a custom universe
+lives on the server's disk: it survives restarts and scheduled refreshes but a
+free-tier spin-down or redeploy clears it (commit the generated
+`universes/<id>.yaml` to keep it permanently).
+
 ### Evals (`make eval`) — these gate the pipeline
 
 * **Classify/summarize handoff gate** (highest priority): fixture `RawItem`s
@@ -246,7 +261,9 @@ self-refreshing status page (`BRIEF_AUTO_BUILD=0` disables). If you change
 
 `pipeline/serve.py` is the single production process: it serves the built
 dashboard, serves artifacts with `no-store` freshness, exposes
-`POST /api/ship` and `POST /api/refresh` (the ↻ button), health-checks at
+`POST /api/ship`, `POST /api/refresh` (the ↻ button), and
+`POST /api/universe` + `/api/universe/delete` (create/remove a custom
+universe), health-checks at
 `/healthz`, and re-runs the pipeline at boot (in the background — the port
 binds immediately so health checks never wait on a pipeline run) plus every
 `BRIEF_REFRESH_MINUTES` (default 30, `0` disables). Scheduled refreshes never
@@ -268,9 +285,10 @@ policy. If the deploy's egress IP is banned by *both* keyless quote vendors
 (Yahoo and Stooq), set `ALPHAVANTAGE_API_KEY` to add the keyed quote tier so
 the market strip still fills (the name is matched flexibly — `ALPHA_VANTAGE_KEY`,
 `AV_KEY`, etc. all resolve). Note the service is public by default and the
-ship/refresh endpoints
-are unauthenticated (auth is out of scope by design) — keep the URL private
-or put Render's access controls in front of it.
+ship/refresh/universe endpoints
+are unauthenticated (auth is out of scope by design) — and `/api/universe` runs
+the pipeline on demand, so keep the URL private or put Render's access controls
+in front of it.
 
 Local dress rehearsal of exactly what Render runs: `make serve` →
 http://localhost:8000.

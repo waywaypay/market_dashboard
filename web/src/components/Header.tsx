@@ -10,6 +10,7 @@ export function Header({
   brief,
   universes,
   onSelectUniverse,
+  onNewUniverse,
   watchlists,
   activeWatchlistId,
   onSelectWatchlist,
@@ -20,6 +21,7 @@ export function Header({
   brief: DailyBrief;
   universes: UniverseEntry[];
   onSelectUniverse: (id: string) => void;
+  onNewUniverse: () => void;
   watchlists: Watchlist[];
   activeWatchlistId: string | null;
   onSelectWatchlist: (id: string | null) => void;
@@ -78,7 +80,11 @@ export function Header({
             id="universe"
             className="rounded-sm border border-white/20 bg-ink px-2 py-1.5 text-[13px] text-white"
             value={brief.universe_id}
-            onChange={(e) => onSelectUniverse(e.target.value)}
+            onChange={(e) =>
+              e.target.value === "__new__"
+                ? onNewUniverse()
+                : onSelectUniverse(e.target.value)
+            }
           >
             {(universes.length
               ? universes
@@ -95,6 +101,7 @@ export function Header({
                 {u.label} · {u.subject_ticker}
               </option>
             ))}
+            <option value="__new__">＋ New universe…</option>
           </select>
 
           {/* Custom watchlists: pick a saved focus or open the editor. A
