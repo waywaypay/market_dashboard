@@ -120,9 +120,10 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
 
         # Yahoo first (pre-market tape); Stooq is the keyless real-data
         # fallback for when Yahoo rate-limits the host's shared egress IP.
+        # Stooq takes the run clock so its as-of-close move tracks `now`.
         return FallbackQuoteProvider(
             YahooQuoteProvider(companies=universe.companies),
-            StooqQuoteProvider(companies=universe.companies),
+            StooqQuoteProvider(companies=universe.companies, now=now),
         )
 
     def real_email() -> EmailProvider:

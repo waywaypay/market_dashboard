@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import statistics
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -663,10 +664,16 @@ def test_yahoo_provider_does_the_crumb_handshake_once_per_process() -> None:
 # ------------------------------------------------------- Stooq (keyless fallback)
 
 
-def _stooq_quote_csv() -> str:
-    from zoneinfo import ZoneInfo
+# Pin the provider's clock so the as-of-close branch (time-of-day aware) is
+# deterministic regardless of when the suite runs. 2026-06-10 is a Wednesday,
+# 11:00 ET is mid-session (not a quiet period) so a non-today print reads flat;
+# 2026-06-13 is a Saturday — between sessions, so it shows the last close's move.
+STOOQ_SESSION_NOW = datetime(2026, 6, 10, 11, 0, tzinfo=ZoneInfo("America/New_York"))
+STOOQ_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))
 
-    today = datetime.now(ZoneInfo("America/New_York")).date()
+
+def _stooq_quote_csv() -> str:
+    today = STOOQ_SESSION_NOW.date()
     stale = today - timedelta(days=1)
     return (
         "Symbol,Date,Time,Open,High,Low,Close,Volume\n"
@@ -690,12 +697,17 @@ def stooq_handler(req: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text=_stooq_quote_csv())
     assert req.url.path == "/q/d/l/"
     assert params["i"] == "d" and "d1" in params and "d2" in params
+    if params["s"].startswith("gh"):  # delisted/unknown: no history to price off either
+        return httpx.Response(200, text="Date,Open,High,Low,Close,Volume\n")
     return httpx.Response(200, text=STOOQ_HISTORY_CSV)
 
 
 def test_stooq_provider_prices_batch_with_history_stats() -> None:
     provider = StooqQuoteProvider(
-        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(stooq_handler)
+        companies=COMPANIES,
+        throttle_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(stooq_handler),
     )
     by = {q.ticker: q for q in provider.snapshot(["VCYT", "NTRA", "GH"])}
 
@@ -706,7 +718,7 @@ def test_stooq_provider_prices_batch_with_history_stats() -> None:
     assert v.volume == 412000 and v.avg_volume == 1_000_000
     moves = [(b - a) / a * 100.0 for a, b in zip(DAILY_CLOSES, DAILY_CLOSES[1:])]
     assert v.sigma == pytest.approx(statistics.stdev(moves[-20:]), abs=0.01)
-    # stale print = no session today yet -> flat, never yesterday's move
+    # in-session with no print for today -> flat, never yesterday's move
     n = by["NTRA"]
     assert n.last == 168.42 and n.chg_pct == 0.0 and n.volume == 0
 
@@ -725,11 +737,44 @@ def test_stooq_provider_fails_over_to_mirror_host() -> None:
         companies=COMPANIES,
         throttle_s=0,
         backoff_s=0,
+        now=STOOQ_SESSION_NOW,
         transport=httpx.MockTransport(flaky_edge),
     )
     by = {q.ticker: q for q in provider.snapshot(["VCYT"])}
     assert by["VCYT"].last == 111.3  # served by stooq.pl
     assert "stooq.pl" in seen
+
+
+def test_stooq_provider_prices_off_daily_close_when_live_tape_is_down() -> None:
+    """The /q/l/ light tape 404s from some egress IPs, but daily history still
+    answers — so every ticker still prices off its last completed close instead
+    of the market going dark. Between sessions that's the last close's actual
+    move ('as of close'); mid-session-but-tapeless it stays flat."""
+
+    def tape_down(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/q/l/":
+            return httpx.Response(404, text="not here")
+        assert req.url.path == "/q/d/l/"
+        return httpx.Response(200, text=STOOQ_HISTORY_CSV)
+
+    transport = httpx.MockTransport(tape_down)
+    last_session_move = round((DAILY_CLOSES[-1] / DAILY_CLOSES[-2] - 1.0) * 100, 2)
+
+    # Saturday: as of Friday's close, showing Friday's actual move (not blank).
+    weekend = StooqQuoteProvider(
+        companies=COMPANIES, throttle_s=0, backoff_s=0, now=STOOQ_WEEKEND_NOW, transport=transport
+    )
+    (q,) = weekend.snapshot(["VCYT"])
+    assert q.last == DAILY_CLOSES[-1]  # last completed daily close
+    assert q.chg_pct == last_session_move != 0.0  # the close's move, never flat-zero
+    assert q.avg_volume == 1_000_000
+
+    # Mid-session with the tape down: no fabricated move — flat at the last close.
+    in_session = StooqQuoteProvider(
+        companies=COMPANIES, throttle_s=0, backoff_s=0, now=STOOQ_SESSION_NOW, transport=transport
+    )
+    (q2,) = in_session.snapshot(["VCYT"])
+    assert q2.last == DAILY_CLOSES[-1] and q2.chg_pct == 0.0
 
 
 def test_stooq_provider_survives_history_outage() -> None:
@@ -739,7 +784,11 @@ def test_stooq_provider_survives_history_outage() -> None:
         return httpx.Response(500, text="history down")
 
     provider = StooqQuoteProvider(
-        companies=COMPANIES, throttle_s=0, transport=httpx.MockTransport(no_history)
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(no_history),
     )
     (q,) = [x for x in provider.snapshot(["VCYT"]) if x.ticker == "VCYT"]
     assert q.last == 111.3  # the price still ships
