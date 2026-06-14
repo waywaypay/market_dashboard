@@ -870,12 +870,30 @@ def test_alphavantage_stays_flat_during_premarket() -> None:
     assert q.last == 111.3 and q.chg_pct == 0.0 and q.volume == 0
 
 
-def test_alphavantage_reads_key_from_env_aliases(monkeypatch) -> None:
-    for name in ("ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY", "ALPHAVANTAGE_KEY", "AV_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
+@pytest.mark.parametrize(
+    "env_name",
+    [
+        "ALPHAVANTAGE_API_KEY",
+        "ALPHA_VANTAGE_API_KEY",
+        "ALPHAVANTAGE_KEY",
+        "ALPHA_VANTAGE_KEY",  # the spelling that bit us in prod
+        "AV_API_KEY",
+        "AV_KEY",
+    ],
+)
+def test_alphavantage_reads_key_from_env_name_variants(monkeypatch, env_name: str) -> None:
     # a key set under a near-miss name is the easiest way to get a silent empty
-    # strip — the provider looks past the exact spelling
-    monkeypatch.setenv("ALPHA_VANTAGE_API_KEY", "abc")
+    # strip — the provider matches the env var by its normalized name
+    for name in (
+        "ALPHAVANTAGE_API_KEY",
+        "ALPHA_VANTAGE_API_KEY",
+        "ALPHAVANTAGE_KEY",
+        "ALPHA_VANTAGE_KEY",
+        "AV_API_KEY",
+        "AV_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(env_name, "abc")
     assert AlphaVantageQuoteProvider(companies=COMPANIES).api_key == "abc"
 
 

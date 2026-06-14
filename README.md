@@ -232,7 +232,8 @@ secrets in the Render dashboard:
 then); also set `SEC_EDGAR_USER_AGENT` to your contact per SEC fair-access
 policy. If the deploy's egress IP is banned by *both* keyless quote vendors
 (Yahoo and Stooq), set `ALPHAVANTAGE_API_KEY` to add the keyed quote tier so
-the market strip still fills. Note the service is public by default and the
+the market strip still fills (the name is matched flexibly — `ALPHA_VANTAGE_KEY`,
+`AV_KEY`, etc. all resolve). Note the service is public by default and the
 ship/refresh endpoints
 are unauthenticated (auth is out of scope by design) — keep the URL private
 or put Render's access controls in front of it.
