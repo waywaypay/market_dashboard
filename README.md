@@ -118,12 +118,19 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   per-ticker chart fallback covers handshake failures. When Yahoo
   rate-limits the host's shared egress IP entirely (HTTP 429 — common on
   free cloud tiers), the chain falls back to **Stooq**: real exchange data
-  over keyless CSV — batched delayed quotes plus daily history for
-  sigma/avg_volume — with no pre-market tape, so pre-open it reports the
-  prior close flat. The next refresh retries Yahoo first, so pre-market
-  quality restores itself. Requests are paced with capped, `Retry-After`-
-  honoring backoff and a hard time budget (`QUOTES_DEADLINE_S`, default
-  120s). RVOL and unusual-move flags stay derived in the fuse stage.
+  over keyless CSV (with `stooq.com`↔`stooq.pl` mirror failover). Stooq's
+  daily-history endpoint is the workhorse and stays reachable even from IPs
+  that 404 its light-quote tape, so the live tape is treated as a bonus:
+  when it answers we show the delayed intraday print, otherwise every ticker
+  still prices off its last completed daily close — the market is never left
+  blank. With the session shut (weekend/holiday/overnight) that close is
+  shown with its own move ("as of close", the convention every finance UI
+  uses); during a trading day still awaiting the first print it stays flat,
+  never passing off a prior session's move as today's. The next refresh
+  retries Yahoo first, so pre-market quality restores itself. Requests are
+  paced with capped, `Retry-After`-honoring backoff and a hard time budget
+  (`QUOTES_DEADLINE_S`, default 120s). RVOL and unusual-move flags stay
+  derived in the fuse stage.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 
