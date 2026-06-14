@@ -13,6 +13,15 @@ show the delayed intraday print; when it doesn't, every ticker still prices
 off its last daily close. The market is never left empty just because the
 live tape is down.
 
+Some egress IPs (datacenter ranges in particular) get neither CSV nor an
+honest error: Stooq answers HTTP 200 with a JavaScript "verify your browser"
+interstitial, or a plain-text "Exceeded the daily hits limit" notice. That is
+not data — parsing it yields an empty quote and a misleading "nothing
+reachable" rail. Such a body is detected, never parsed, and (being per-IP and
+identical across mirrors, retries and tickers) fails the tier *fast* with the
+real reason, so the chain falls through to the next vendor instead of walling
+every ticker.
+
 Trade-offs vs Yahoo: the last price is the exchange-delayed print (~15 min
 during the session) and there is no pre-market tape. With the market shut
 (weekends, holidays, overnight) — or whenever only daily history is
@@ -60,6 +69,12 @@ def _symbol(ticker: str) -> str:
     return ticker.lower().replace(".", "-") + ".us"
 
 
+class _Blocked(RuntimeError):
+    """Stooq served a bot-challenge / hit-limit page instead of CSV. Per-IP and
+    terminal for this run, so retrying mirrors or probing more tickers is futile
+    — surface it and let the chain move to the next vendor."""
+
+
 class StooqQuoteProvider(QuoteProvider):
     def __init__(
         self,
@@ -94,7 +109,14 @@ class StooqQuoteProvider(QuoteProvider):
         rows = self._quote_rows_best_effort(tickers)
         quotes: list[Quote] = []
         for ticker in tickers:
-            quote = self._build(ticker, rows.get(ticker.upper()), today_us, quiet)
+            try:
+                quote = self._build(ticker, rows.get(ticker.upper()), today_us, quiet)
+            except _Blocked as exc:
+                # A challenge/limit page dooms every ticker identically — stop on
+                # the first rather than re-hitting the wall N times, and report
+                # the real reason so the rail isn't a misleading "nothing
+                # reachable". The chain then falls through to the next vendor.
+                raise RuntimeError(f"Stooq unavailable from this host — {exc}") from exc
             if quote is not None:
                 quotes.append(quote)
         if not quotes:
@@ -181,9 +203,13 @@ class StooqQuoteProvider(QuoteProvider):
         return rows
 
     def _history_best_effort(self, ticker: str) -> tuple[list[float], list[int]]:
-        """sigma/avg inputs must never take the price down with them."""
+        """sigma/avg inputs must never take the price down with them — except a
+        blocked host, which dooms every ticker and must short-circuit the tier
+        rather than silently degrading each one to a default sigma."""
         try:
             return self._daily_history(ticker)
+        except _Blocked:
+            raise
         except Exception as exc:
             print(
                 f"[quotes] {ticker}: Stooq history unavailable "
@@ -221,10 +247,15 @@ class StooqQuoteProvider(QuoteProvider):
 
     def _get(self, path: str, params: dict[str, str]) -> httpx.Response:
         """GET a Stooq CSV endpoint, failing over across mirror hosts and
-        retrying with capped backoff. A single bad edge (404/limit/5xx) or a
-        transient transport error must not sink the whole fallback tier."""
+        retrying with capped backoff. A genuine CSV reply wins. A challenge /
+        hit-limit page (HTTP 200, but HTML or the 'exceeded the daily hits limit'
+        sentinel) is per-IP and identical across edges and retries, so after one
+        pass over the mirrors it raises _Blocked — never retried, never parsed.
+        A single bad edge (404/limit/5xx) or transient transport error still
+        fails over and retries; only those must not sink the whole tier."""
         last_response: httpx.Response | None = None
         last_error: Exception | None = None
+        block_reason: str | None = None
         wait = self.backoff_s
         for attempt in range(self.max_attempts):
             if attempt:
@@ -238,12 +269,46 @@ class StooqQuoteProvider(QuoteProvider):
                     last_error = exc
                     continue
                 if response.status_code == 200:
-                    return response
+                    if _looks_like_csv(response.text):
+                        return response
+                    # 200 but a wall: note it and try the mirror once — the other
+                    # edge is occasionally healthy — but don't retry past that.
+                    block_reason = _block_reason(response.text)
+                    continue
                 last_response = response  # 404/limit/5xx: the mirror or a retry may answer
+            if block_reason is not None:
+                raise _Blocked(block_reason)
         if last_response is not None:
             raise RuntimeError(f"Stooq returned HTTP {last_response.status_code}")
         assert last_error is not None
         raise last_error
+
+
+def _looks_like_csv(text: str) -> bool:
+    """True only for a genuine Stooq CSV reply, whose first line is a
+    comma-separated header (or data) row. Rejects the HTML 'verify your browser'
+    interstitial and the plain-text 'Exceeded the daily hits limit' notice that
+    some egress IPs receive with HTTP 200, so a blocked edge fails over / fails
+    fast instead of being parsed into an empty quote."""
+    stripped = text.lstrip()
+    if not stripped or stripped[0] == "<":  # HTML challenge / error page
+        return False
+    first_line = stripped.splitlines()[0]
+    if "exceeded the daily hits limit" in first_line.lower():
+        return False
+    return "," in first_line
+
+
+def _block_reason(text: str) -> str:
+    """A concise, honest reason for the rail when Stooq returns a non-CSV wall."""
+    head = text.lstrip()[:300].lower()
+    if "exceeded the daily hits limit" in head:
+        return "Stooq returned a daily-hit-limit notice, not CSV"
+    if "requires javascript" in head or "verify your browser" in head:
+        return "Stooq served a JavaScript bot-challenge page, not CSV"
+    if head[:1] == "<":
+        return "Stooq served an HTML page, not CSV"
+    return "Stooq returned a non-CSV body"
 
 
 def _num(value: str | None) -> float | None:
