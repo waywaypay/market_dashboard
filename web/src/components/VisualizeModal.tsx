@@ -6,7 +6,15 @@ import type { DailyBrief } from "../lib/contracts";
 import { fmtDate } from "../lib/format";
 import { PriceChart } from "./PriceChart";
 
-export function VisualizeModal({ brief, onClose }: { brief: DailyBrief; onClose: () => void }) {
+export function VisualizeModal({
+  brief,
+  focusTicker,
+  onClose,
+}: {
+  brief: DailyBrief;
+  focusTicker?: string;
+  onClose: () => void;
+}) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -47,7 +55,7 @@ export function VisualizeModal({ brief, onClose }: { brief: DailyBrief; onClose:
         </div>
 
         <div className="p-4 sm:p-5">
-          <PriceChart brief={brief} />
+          <PriceChart brief={brief} focusTicker={focusTicker} />
         </div>
       </div>
     </div>

@@ -19,10 +19,9 @@ export function MarketStrip({
   hoverTicker: string | null;
   hoverItemId: string | null;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
-  onVisualize: () => void;
+  onVisualize: (ticker?: string) => void;
 }) {
   const [sort, setSort] = useState<SortKey>("config");
-  const hasHistory = Object.keys(brief.history).length > 0;
 
   const quotes = useMemo(() => {
     const subject = brief.market.find((q) => q.ticker === brief.subject_ticker);
@@ -40,16 +39,14 @@ export function MarketStrip({
         title="Market"
         hint={
           <div className="flex items-center gap-2">
-            {hasHistory && (
-              <button
-                type="button"
-                onClick={onVisualize}
-                className="flex items-center gap-1 rounded-sm border border-hairline px-1.5 py-0.5 font-medium text-ink transition-colors hover:border-accent hover:text-accent"
-                title="Overlay 3-month price history for the peer set"
-              >
-                <span aria-hidden="true">📈</span> Visualize
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => onVisualize()}
+              className="flex items-center gap-1 rounded-sm border border-hairline px-1.5 py-0.5 font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+              title="Overlay 3-month price history for the peer set (or click a tile)"
+            >
+              <span aria-hidden="true">📈</span> Visualize
+            </button>
             <div className="flex items-center gap-1" role="group" aria-label="Sort tiles">
               <span className="mr-1 hidden sm:inline">sort</span>
               {(
@@ -94,6 +91,7 @@ export function MarketStrip({
                 (hoverItemId != null && q.driver_item_id === hoverItemId)
               }
               onHover={onHover}
+              onVisualize={onVisualize}
             />
           ))}
         </ul>
@@ -107,28 +105,39 @@ function Tile({
   isSubject,
   highlighted,
   onHover,
+  onVisualize,
 }: {
   quote: Quote;
   isSubject: boolean;
   highlighted: boolean;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
+  onVisualize: (ticker?: string) => void;
 }) {
   const dir = quote.chg_pct >= 0 ? "text-up" : "text-down";
   const enter = () => onHover(quote.ticker, quote.driver_item_id ?? null);
   const leave = () => onHover(null, null);
+  const open = () => onVisualize(quote.ticker);
 
   return (
     <li className="min-w-[148px] flex-1 sm:min-w-0">
       <div
+        role="button"
         tabIndex={0}
         onMouseEnter={enter}
         onMouseLeave={leave}
         onFocus={enter}
         onBlur={leave}
+        onClick={open}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            open();
+          }
+        }}
         aria-label={`${quote.ticker} ${fmtPct(quote.chg_pct)} on ${fmtRvol(quote.rvol)} relative volume${
           quote.flagged ? ", unusual move" : ""
-        }${quote.driver_item_id ? ", linked to a priority signal" : ""}`}
-        className={`group h-full cursor-default rounded-md border bg-card p-2.5 shadow-tile transition-all ${
+        }${quote.driver_item_id ? ", linked to a priority signal" : ""} — chart price history`}
+        className={`group h-full cursor-pointer rounded-md border bg-card p-2.5 shadow-tile transition-all hover:border-accent hover:shadow-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
           highlighted
             ? "border-accent ring-2 ring-accent/35 shadow-lift"
             : "border-hairline"
