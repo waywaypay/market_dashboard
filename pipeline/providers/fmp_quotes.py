@@ -29,8 +29,14 @@ from pipeline.market_hours import is_quiet_period
 from pipeline.providers.base import QuoteProvider
 from pipeline.providers.util import make_client, match_api_key
 
-QUOTE_URL = "https://financialmodelingprep.com/api/v3/quote/{symbols}"
-DEFAULT_SIGMA = 3.0  # the batched quote has no trailing history for a real sigma
+# FMP serves the same quote under two APIs: legacy keys use /api/v3 (and can
+# batch many symbols in one call); keys issued on the newer plans use /stable
+# (one symbol per call). We can't know which a given key is provisioned for, so
+# we try the batched v3 first and fall back to per-symbol /stable — whichever
+# answers. Field names drift slightly between them, hence tolerant parsing.
+V3_BATCH_URL = "https://financialmodelingprep.com/api/v3/quote/{symbols}"
+STABLE_QUOTE_URL = "https://financialmodelingprep.com/stable/quote"
+DEFAULT_SIGMA = 3.0  # the quote has no trailing history for a real sigma
 US_EASTERN = ZoneInfo("America/New_York")
 
 _KEY_NAMES = {
@@ -82,26 +88,55 @@ class FmpQuoteProvider(QuoteProvider):
         return quotes
 
     def _quote_rows(self, tickers: list[str]) -> dict[str, dict]:
+        """Try the batched v3 endpoint (one call); if the key isn't provisioned
+        for it, fall back to per-symbol /stable. Whichever serves wins."""
+        try:
+            return self._v3_batch(tickers)
+        except Exception as exc:
+            print(
+                f"[quotes] FMP v3 batch unavailable ({type(exc).__name__}: {exc}) "
+                "— retrying on /stable per symbol",
+                file=sys.stderr,
+            )
+            return self._stable_per_symbol(tickers)
+
+    def _v3_batch(self, tickers: list[str]) -> dict[str, dict]:
         symbols = ",".join(t.upper() for t in tickers)
-        response = self._client.get(
-            QUOTE_URL.format(symbols=symbols), params={"apikey": self.api_key}
-        )
+        data = self._get_json(V3_BATCH_URL.format(symbols=symbols), {"apikey": self.api_key})
+        rows = _index_by_symbol(data)
+        if not rows:
+            raise RuntimeError("v3 batch returned no rows")
+        return rows
+
+    def _stable_per_symbol(self, tickers: list[str]) -> dict[str, dict]:
+        rows: dict[str, dict] = {}
+        last_error: Exception | None = None
+        for ticker in tickers:
+            try:
+                data = self._get_json(
+                    STABLE_QUOTE_URL, {"symbol": ticker.upper(), "apikey": self.api_key}
+                )
+                rows.update(_index_by_symbol(data))
+            except Exception as exc:
+                last_error = exc
+                print(f"[quotes] {ticker}: FMP /stable {type(exc).__name__}: {exc}", file=sys.stderr)
+        if not rows:
+            raise RuntimeError(f"FMP /stable returned nothing (last error: {last_error})")
+        return rows
+
+    def _get_json(self, url: str, params: dict[str, str]) -> list:
+        response = self._client.get(url, params=params)
         if response.status_code == 429:  # daily/minute budget spent
-            raise RuntimeError("FMP rate-limited (HTTP 429)")
+            raise RuntimeError("rate-limited (HTTP 429)")
         if response.status_code != 200:
-            raise RuntimeError(f"FMP HTTP {response.status_code}: {response.text[:160]}")
+            raise RuntimeError(f"HTTP {response.status_code}: {response.text[:120]}")
         data = response.json()
-        # Success is a JSON array; errors (bad key, plan limit) come back as an
-        # object with an "Error Message" — surface it rather than reading {}.
+        # Success is a JSON array; errors (bad key, plan/endpoint limit) come back
+        # as an object with an "Error Message" — surface it rather than reading {}.
         if isinstance(data, dict):
             msg = data.get("Error Message") or data.get("message") or str(data)[:160]
             raise RuntimeError(f"FMP rejected the request: {msg}")
-        rows: dict[str, dict] = {}
-        for row in data:
-            symbol = str(row.get("symbol") or "").upper()
-            if symbol:
-                rows[symbol] = row
-        return rows
+        return data
 
     def _build(self, ticker: str, row: dict, today: date, quiet: bool) -> Quote | None:
         last = _num(row.get("price"))
@@ -116,15 +151,28 @@ class FmpQuoteProvider(QuoteProvider):
         chg_pct = round((last / prev - 1.0) * 100, 2) if (prev and show_session) else 0.0
         volume = int(_num(row.get("volume")) or 0) if show_session else 0
 
+        # v3 calls it avgVolume; /stable calls it averageVolume — accept either,
+        # so RVOL works regardless of which endpoint served the key.
+        avg_volume = _num(row.get("avgVolume")) or _num(row.get("averageVolume")) or 0
+
         return Quote(
             ticker=ticker,
             name=self.companies.get(ticker) or row.get("name") or ticker,
             last=round(last, 4),
             chg_pct=chg_pct,
             volume=volume,
-            avg_volume=int(_num(row.get("avgVolume")) or 0),  # -> RVOL in the fuse stage
+            avg_volume=int(avg_volume),  # -> RVOL in the fuse stage
             sigma=DEFAULT_SIGMA,
         )
+
+
+def _index_by_symbol(data: list) -> dict[str, dict]:
+    rows: dict[str, dict] = {}
+    for row in data:
+        symbol = str(row.get("symbol") or "").upper()
+        if symbol:
+            rows[symbol] = row
+    return rows
 
 
 def _num(value: object) -> float | None:
