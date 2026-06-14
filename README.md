@@ -208,10 +208,11 @@ and hovering a signal highlights its ticker's tile — the price↔news link is
 the product's point of view, rendered as an interaction.
 
 **Custom watchlists** let you carve a personal focus out of the universe. The
-rail's watchlist selector picks **All names** (the full peer set, the default)
-or one of your saved lists; **Manage watchlists…** opens an editor to create,
-rename, delete, and tick which names belong. Choosing a watchlist focuses the
-whole cockpit on it — the market strip, priority signals, and by-company cards
+header's watchlist selector (next to the universe selector) picks **All names**
+(the full peer set, the default) or one of your saved lists; **★ Manage** opens
+an editor to create, rename, delete, and tick which names belong. Choosing a
+watchlist focuses the whole cockpit on it — the market strip, priority signals,
+and by-company cards
 filter to those tickers (sector-wide headlines drop out of a focused view), and
 member tiles get a ★ for one-click pruning. True to the product's
 server-stateless design (no DB, no auth, no multi-user), watchlists are a
