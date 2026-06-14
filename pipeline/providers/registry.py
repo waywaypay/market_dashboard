@@ -125,15 +125,29 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
             YahooQuoteProvider(companies=universe.companies),
             StooqQuoteProvider(companies=universe.companies, now=now),
         ]
-        # Last resort: a keyed vendor that answers from cloud IPs the keyless
-        # tiers are blocked on. Only joins the chain when a key is present
-        # (under any of the accepted env-var aliases).
+        # Keyed tiers that answer from cloud IPs the keyless vendors get blocked
+        # on. Each only joins the chain when its key is present (matched by
+        # normalized env-var name). Ordered by data richness then budget:
+        # FMP (batched, carries volume -> RVOL, 250/day), Finnhub (price only,
+        # 60/min), Alpha Vantage (price only, 25/day — the tiny last resort).
+        from pipeline.providers.fmp_quotes import (
+            FmpQuoteProvider,
+            api_key_from_env as fmp_key,
+        )
+        from pipeline.providers.finnhub_quotes import (
+            FinnhubQuoteProvider,
+            api_key_from_env as finnhub_key,
+        )
         from pipeline.providers.alphavantage_quotes import (
             AlphaVantageQuoteProvider,
-            api_key_from_env,
+            api_key_from_env as alphavantage_key,
         )
 
-        if api_key_from_env():
+        if fmp_key():
+            chain.append(FmpQuoteProvider(companies=universe.companies, now=now))
+        if finnhub_key():
+            chain.append(FinnhubQuoteProvider(companies=universe.companies, now=now))
+        if alphavantage_key():
             chain.append(AlphaVantageQuoteProvider(companies=universe.companies, now=now))
         return FallbackQuoteProvider(*chain)
 
