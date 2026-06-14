@@ -25,6 +25,7 @@ today's.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 from datetime import date, datetime
@@ -41,20 +42,21 @@ QUOTE_URL = "https://www.alphavantage.co/query"
 DEFAULT_SIGMA = 3.0  # GLOBAL_QUOTE has no history; ship a conservative stand-in
 US_EASTERN = ZoneInfo("America/New_York")
 
-# Accept the obvious spellings — a key set under the wrong name is the easiest
-# way to silently get an empty strip, so we look past the exact env name.
-_KEY_ENV_ALIASES = (
-    "ALPHAVANTAGE_API_KEY",
-    "ALPHA_VANTAGE_API_KEY",
-    "ALPHAVANTAGE_KEY",
-    "AV_API_KEY",
-)
+# A key set under a slightly different name is the easiest way to silently get
+# an empty strip, so match the env var by its NORMALIZED name (upper-cased,
+# separators dropped) rather than an exact string. This resolves every
+# reasonable spelling — ALPHAVANTAGE_API_KEY, ALPHA_VANTAGE_KEY, AV_KEY, … —
+# to the same canonical set.
+_CANONICAL_KEY_NAMES = {"ALPHAVANTAGEAPIKEY", "ALPHAVANTAGEKEY", "AVAPIKEY", "AVKEY"}
+
+
+def _normalize(name: str) -> str:
+    return re.sub(r"[^A-Z0-9]", "", name.upper())
 
 
 def api_key_from_env() -> str | None:
-    for name in _KEY_ENV_ALIASES:
-        value = os.environ.get(name)
-        if value:
+    for name, value in os.environ.items():
+        if value and _normalize(name) in _CANONICAL_KEY_NAMES:
             return value.strip()
     return None
 
