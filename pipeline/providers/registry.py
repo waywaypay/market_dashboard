@@ -121,10 +121,17 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
         # Yahoo first (pre-market tape); Stooq is the keyless real-data
         # fallback for when Yahoo rate-limits the host's shared egress IP.
         # Stooq takes the run clock so its as-of-close move tracks `now`.
-        return FallbackQuoteProvider(
+        chain: list[QuoteProvider] = [
             YahooQuoteProvider(companies=universe.companies),
             StooqQuoteProvider(companies=universe.companies, now=now),
-        )
+        ]
+        # Last resort: a keyed vendor that answers from cloud IPs the keyless
+        # tiers are blocked on. Only joins the chain when a key is present.
+        if os.environ.get("ALPHAVANTAGE_API_KEY"):
+            from pipeline.providers.alphavantage_quotes import AlphaVantageQuoteProvider
+
+            chain.append(AlphaVantageQuoteProvider(companies=universe.companies, now=now))
+        return FallbackQuoteProvider(*chain)
 
     def real_email() -> EmailProvider:
         from pipeline.providers.real_stubs import SmtpEmailProvider
