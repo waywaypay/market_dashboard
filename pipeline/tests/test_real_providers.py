@@ -1064,6 +1064,43 @@ def test_fmp_surfaces_an_error_body() -> None:
         provider.snapshot(["VCYT"])
 
 
+def test_fmp_falls_back_to_stable_per_symbol_for_new_keys() -> None:
+    """Newly-issued keys are provisioned for /stable, not /api/v3. The provider
+    must fall back to per-symbol /stable and parse its `averageVolume` field so
+    RVOL still works — this is the path the prod key actually takes."""
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert dict(req.url.params)["apikey"] == "fmp-test"
+        if req.url.path.startswith("/api/v3/"):  # legacy endpoint not on this key
+            return httpx.Response(403, json={"Error Message": "Exclusive Endpoint: upgrade"})
+        assert req.url.path == "/stable/quote"
+        sym = dict(req.url.params)["symbol"]
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "symbol": sym,
+                    "name": f"{sym} Inc.",
+                    "price": 111.3,
+                    "previousClose": 106.0,
+                    "volume": 412000,
+                    "averageVolume": 1_000_000,  # /stable's spelling of avgVolume
+                    "timestamp": FMP_FRIDAY_TS,
+                }
+            ],
+        )
+
+    provider = FmpQuoteProvider(
+        companies=COMPANIES,
+        api_key="fmp-test",
+        now=FMP_WEEKEND_NOW,
+        transport=httpx.MockTransport(handler),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 111.3 and q.chg_pct == 5.0
+    assert q.volume == 412000 and q.avg_volume == 1_000_000  # RVOL from averageVolume
+
+
 def test_fmp_reads_key_from_env_name_variants(monkeypatch) -> None:
     for name in ("FMP_KEY", "FMP_API_KEY", "FINANCIALMODELINGPREP_API_KEY"):
         monkeypatch.delenv(name, raising=False)
