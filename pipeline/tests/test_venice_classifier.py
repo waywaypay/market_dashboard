@@ -67,9 +67,11 @@ def test_classifies_via_mocked_venice(universe) -> None:
     captured = {}
 
     def handler(req: httpx.Request) -> httpx.Response:
+        body = json.loads(req.content)
         captured["url"] = str(req.url)
-        captured["model"] = json.loads(req.content)["model"]
+        captured["model"] = body["model"]
         captured["auth"] = req.headers.get("authorization")
+        captured["user"] = body["messages"][-1]["content"]
         return _venice_response(batch)
 
     provider = VeniceClassifierProvider(
@@ -81,6 +83,10 @@ def test_classifies_via_mocked_venice(universe) -> None:
     assert captured["url"] == "https://api.venice.ai/api/v1/chat/completions"
     assert captured["model"] == "claude-sonnet-4-6"  # default Claude model
     assert captured["auth"] == "Bearer vk-test"
+    # the exact JSON shape must be spelled out — Venice has no schema-injection
+    # channel, so missing key names is what makes the model's reply fail to validate
+    for key in ("item_id", "classifications", "is_subject_relevant", "materiality"):
+        assert key in captured["user"]
     by_id = {c.item_id: c for c in result.classifications}
     assert by_id["v1"].materiality == 5 and by_id["v1"].is_subject_relevant
     assert by_id["v2"].materiality == 1 and not by_id["v2"].is_subject_relevant
@@ -104,6 +110,32 @@ def test_model_is_overridable(universe) -> None:
     )
     provider.classify(_items()[:1], universe)
     assert captured["model"] == "claude-opus-4-6"
+
+
+def test_tolerates_fenced_and_prefixed_json(universe) -> None:
+    """A stray ```json fence or a 'Here is the JSON:' preamble must still parse —
+    not silently fall back to rules (which is what masked the live failure)."""
+    payload = json.dumps({
+        "tldr": "ok",
+        "classifications": [
+            {"item_id": "v1", "ticker": "VCYT", "category": "Regulatory",
+             "materiality": 4, "summary": "s", "is_subject_relevant": True},
+            {"item_id": "v2", "ticker": None, "category": "Clinical",
+             "materiality": 1, "summary": "s", "is_subject_relevant": False},
+        ],
+    })
+    messy = f"Here is the JSON you asked for:\n```json\n{payload}\n```\nLet me know!"
+    provider = VeniceClassifierProvider(
+        api_key="vk-test",
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(
+                200, json={"choices": [{"message": {"content": messy}}]}
+            )
+        ),
+    )
+    result = provider.classify(_items(), universe)
+    assert result.engine == "venice"
+    assert {c.item_id for c in result.classifications} == {"v1", "v2"}
 
 
 def test_falls_back_to_rules_on_http_error(universe) -> None:
