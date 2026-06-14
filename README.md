@@ -109,19 +109,23 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   `category: news` and a published-date window (`EXA_LOOKBACK_HOURS`, default
   36; `EXA_NUM_RESULTS` per query, default 10). Undated results are dropped —
   they can't pass the no-look-ahead gate.
-* **Quotes (Yahoo)** — no key needed. Primary path: ONE batched v7 quote
-  call per refresh prices the whole universe (pre/post-market price,
-  previous close, day volume, 3-month average volume), behind a
-  cookie+crumb handshake done once per process. `sigma` (stdev of the last
-  `QUOTES_TRAILING_DAYS` daily % moves, default 20) comes from per-ticker
-  daily history, cached per UTC day and best-effort — a throttled history
-  call degrades to a conservative default instead of dropping the ticker.
-  If the handshake fails, a per-ticker chart fallback rebuilds the same
-  quote. RVOL and unusual-move flags stay derived in the fuse stage.
-  Yahoo rate-limits shared cloud IPs, so requests are paced and 429s get a
-  capped exponential backoff honoring `Retry-After`. If it still
-  misbehaves, mix back with `BRIEF_QUOTES=fixture` while you pick a paid
-  vendor.
+* **Quotes (Yahoo)** — no key needed, via the v8 chart API. (Yahoo locked
+  the batched v7 quote endpoint behind a cookie+crumb handshake that now
+  406s the crumb and 401s the quote for datacenter IPs, so it's gone — v8
+  chart is the endpoint that still answers without auth.) Per ticker, two
+  charts: today's pre/post tape for the last traded price and % move off the
+  prior close, plus daily history for volume and `sigma` (stdev of the last
+  `QUOTES_TRAILING_DAYS` daily % moves, default 20). History is cached per
+  UTC day and best-effort — a throttled history call degrades to a
+  conservative default sigma (and unknown average volume) instead of
+  dropping the ticker. Each ticker is independent: one failing never sinks
+  the rest, and the run only fails the source when *nothing* priced. RVOL
+  and unusual-move flags stay derived in the fuse stage. Yahoo rate-limits
+  shared cloud IPs, so requests are paced and 429s get a capped exponential
+  backoff honoring `Retry-After`; on a shared egress IP (e.g. Render's free
+  plan) Yahoo may still 429 every call, leaving the market strip empty —
+  move to a static outbound IP, or mix back with `BRIEF_QUOTES=fixture`
+  while you pick a paid vendor.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 
