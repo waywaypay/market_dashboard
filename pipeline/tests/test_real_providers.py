@@ -21,6 +21,8 @@ from pipeline.providers.exa_news import ExaNewsProvider
 from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.util import infer_ticker, strip_tags
 from pipeline.providers import stooq_quotes
+from pipeline.providers import alphavantage_quotes
+from pipeline.providers.alphavantage_quotes import AlphaVantageQuoteProvider
 from pipeline.providers.fallback import FallbackQuoteProvider
 from pipeline.providers.stooq_quotes import StooqQuoteProvider
 from pipeline.providers.yahoo_quotes import (
@@ -40,10 +42,12 @@ def _fresh_quote_provider_state():
     _HISTORY_CACHE.clear()
     _SESSION.update(crumb=None, cookies=None)
     stooq_quotes._HISTORY_CACHE.clear()
+    alphavantage_quotes._QUOTE_CACHE.clear()
     yield
     _HISTORY_CACHE.clear()
     _SESSION.update(crumb=None, cookies=None)
     stooq_quotes._HISTORY_CACHE.clear()
+    alphavantage_quotes._QUOTE_CACHE.clear()
 
 NOW = datetime.now(timezone.utc)
 COMPANIES = {"VCYT": "Veracyte", "NTRA": "Natera", "GH": "Guardant Health"}
@@ -805,6 +809,131 @@ def test_stooq_provider_raises_when_nothing_usable() -> None:
     )
     with pytest.raises(RuntimeError, match="no usable rows"):
         provider.snapshot(["VCYT"])
+
+
+# ------------------------------------------------ Alpha Vantage (keyed last resort)
+
+AV_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))  # Saturday
+AV_PREMARKET_NOW = datetime(2026, 6, 10, 8, 0, tzinfo=ZoneInfo("America/New_York"))  # Wed 08:00 ET
+
+
+def _av_quote(symbol: str, price: float, prev: float, day: str, volume: int = 1_234_567) -> dict:
+    return {
+        "Global Quote": {
+            "01. symbol": symbol,
+            "05. price": str(price),
+            "06. volume": str(volume),
+            "07. latest trading day": day,
+            "08. previous close": str(prev),
+            "10. change percent": "5.0000%",
+        }
+    }
+
+
+def _av_handler(day: str):
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert "alphavantage.co" in req.url.host
+        params = dict(req.url.params)
+        assert params["function"] == "GLOBAL_QUOTE" and params["apikey"] == "test-key"
+        return httpx.Response(200, json=_av_quote(params["symbol"], 111.3, 106.0, day))
+
+    return handler
+
+
+def test_alphavantage_prices_as_of_close_with_session_move() -> None:
+    # Saturday: latest trading day is Friday -> show Friday's close AND its move.
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="test-key",
+        throttle_s=0,
+        now=AV_WEEKEND_NOW,
+        transport=httpx.MockTransport(_av_handler("2026-06-12")),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.name == "Veracyte" and q.last == 111.3
+    assert q.chg_pct == 5.0  # 111.3 vs previous close 106.0
+    assert q.volume == 1_234_567
+    assert q.avg_volume == 0 and q.sigma == alphavantage_quotes.DEFAULT_SIGMA
+
+
+def test_alphavantage_stays_flat_during_premarket() -> None:
+    # Weekday pre-market, data still stamped the prior session -> flat, no volume,
+    # never passing off yesterday's move as today's.
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="test-key",
+        throttle_s=0,
+        now=AV_PREMARKET_NOW,
+        transport=httpx.MockTransport(_av_handler("2026-06-09")),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 111.3 and q.chg_pct == 0.0 and q.volume == 0
+
+
+def test_alphavantage_requires_a_key() -> None:
+    provider = AlphaVantageQuoteProvider(companies=COMPANIES, api_key=None)
+    provider.api_key = None  # defeat any ambient ALPHAVANTAGE_API_KEY
+    with pytest.raises(RuntimeError, match="ALPHAVANTAGE_API_KEY"):
+        provider.snapshot(["VCYT"])
+
+
+def test_alphavantage_rate_limit_aborts_the_batch() -> None:
+    calls = {"n": 0}
+
+    def throttled(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, json={"Note": "5 calls per minute / 25 per day"})
+
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="test-key",
+        throttle_s=0,
+        now=AV_WEEKEND_NOW,
+        transport=httpx.MockTransport(throttled),
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["VCYT", "NTRA", "GH"])
+    assert calls["n"] == 1  # stopped after the first quota notice — spared the key
+
+
+def test_alphavantage_caches_within_ttl_to_respect_the_daily_budget() -> None:
+    calls = {"n": 0}
+
+    def counting(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return _av_handler("2026-06-12")(req)
+
+    transport = httpx.MockTransport(counting)
+    for _ in range(2):  # two refreshes, same process/day
+        provider = AlphaVantageQuoteProvider(
+            companies=COMPANIES, api_key="test-key", throttle_s=0, now=AV_WEEKEND_NOW,
+            transport=transport,
+        )
+        (q,) = provider.snapshot(["VCYT"])
+        assert q.last == 111.3
+    assert calls["n"] == 1  # second refresh served from cache, no extra request
+
+
+def test_alphavantage_skips_unknown_symbol_and_caches_the_miss() -> None:
+    calls = {"n": 0}
+
+    def empty(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, json={"Global Quote": {}})
+
+    transport = httpx.MockTransport(empty)
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES, api_key="test-key", throttle_s=0, now=AV_WEEKEND_NOW, transport=transport
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["ZZZZ"])
+    # a second refresh must not re-spend the daily budget on a known-dead symbol
+    again = AlphaVantageQuoteProvider(
+        companies=COMPANIES, api_key="test-key", throttle_s=0, now=AV_WEEKEND_NOW, transport=transport
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        again.snapshot(["ZZZZ"])
+    assert calls["n"] == 1  # the miss was cached
 
 
 # ------------------------------------------------------------- quote vendor chain

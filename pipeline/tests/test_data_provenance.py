@@ -46,6 +46,25 @@ def test_registry_records_modes(monkeypatch) -> None:
     assert modes["email"] == "fixture"
 
 
+def test_alphavantage_tier_joins_the_quote_chain_only_with_a_key(monkeypatch) -> None:
+    from pipeline.providers.fallback import FallbackQuoteProvider
+
+    universe = load_universe(UNIVERSES_DIR / "diagnostics.yaml")
+    monkeypatch.setenv("BRIEF_PROVIDERS", "real")
+    monkeypatch.setenv("BRIEF_EMAIL", "fixture")
+    monkeypatch.setenv("BRIEF_CLASSIFIER", "fixture")
+
+    monkeypatch.delenv("ALPHAVANTAGE_API_KEY", raising=False)
+    chain = build_providers(universe, EVAL_NOW).quotes
+    assert isinstance(chain, FallbackQuoteProvider)
+    names = [type(p).__name__ for p in chain.providers]
+    assert names == ["YahooQuoteProvider", "StooqQuoteProvider"]  # keyless only
+
+    monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "k")
+    names_keyed = [type(p).__name__ for p in build_providers(universe, EVAL_NOW).quotes.providers]
+    assert names_keyed[-1] == "AlphaVantageQuoteProvider"  # appended as the last resort
+
+
 def test_fixture_run_stamps_fixture_mode(monkeypatch, tmp_path) -> None:
     for var in ("BRIEF_PROVIDERS", "BRIEF_RSS", "BRIEF_EDGAR", "BRIEF_NEWS", "BRIEF_QUOTES"):
         monkeypatch.delenv(var, raising=False)  # library default: fixture
