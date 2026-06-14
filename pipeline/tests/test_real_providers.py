@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import statistics
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -19,23 +20,38 @@ from pipeline.providers.edgar import SecEdgarProvider
 from pipeline.providers.exa_news import ExaNewsProvider
 from pipeline.providers.rss import HttpRSSProvider
 from pipeline.providers.util import infer_ticker, strip_tags
+from pipeline.providers import stooq_quotes
+from pipeline.providers import alphavantage_quotes
+from pipeline.providers import fmp_quotes
+from pipeline.providers import finnhub_quotes
+from pipeline.providers.alphavantage_quotes import AlphaVantageQuoteProvider
+from pipeline.providers.fmp_quotes import FmpQuoteProvider
+from pipeline.providers.finnhub_quotes import FinnhubQuoteProvider
+from pipeline.providers.fallback import FallbackQuoteProvider
+from pipeline.providers.stooq_quotes import StooqQuoteProvider
 from pipeline.providers.yahoo_quotes import (
     _HISTORY_CACHE,
     _SESSION,
     DEFAULT_SIGMA,
     YahooQuoteProvider,
 )
+from pipeline.contracts import Quote
+from pipeline.providers.base import QuoteProvider
 from pipeline.contracts.universe import RSSFeed
 
 
 @pytest.fixture(autouse=True)
-def _fresh_yahoo_state():
-    """Both module-level caches must not leak between tests."""
+def _fresh_quote_provider_state():
+    """Module-level caches must not leak between tests."""
     _HISTORY_CACHE.clear()
     _SESSION.update(crumb=None, cookies=None)
+    stooq_quotes._HISTORY_CACHE.clear()
+    alphavantage_quotes._QUOTE_CACHE.clear()
     yield
     _HISTORY_CACHE.clear()
     _SESSION.update(crumb=None, cookies=None)
+    stooq_quotes._HISTORY_CACHE.clear()
+    alphavantage_quotes._QUOTE_CACHE.clear()
 
 NOW = datetime.now(timezone.utc)
 COMPANIES = {"VCYT": "Veracyte", "NTRA": "Natera", "GH": "Guardant Health"}
@@ -651,3 +667,518 @@ def test_yahoo_provider_does_the_crumb_handshake_once_per_process() -> None:
         (q,) = provider.snapshot(["VCYT"])
         assert q.last == 105.0
     assert crumb_calls["n"] == 1  # cookie+crumb reused across instances
+
+
+# ------------------------------------------------------- Stooq (keyless fallback)
+
+
+# Pin the provider's clock so the as-of-close branch (time-of-day aware) is
+# deterministic regardless of when the suite runs. 2026-06-10 is a Wednesday,
+# 11:00 ET is mid-session (not a quiet period) so a non-today print reads flat;
+# 2026-06-13 is a Saturday — between sessions, so it shows the last close's move.
+STOOQ_SESSION_NOW = datetime(2026, 6, 10, 11, 0, tzinfo=ZoneInfo("America/New_York"))
+STOOQ_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))
+
+
+def _stooq_quote_csv() -> str:
+    today = STOOQ_SESSION_NOW.date()
+    stale = today - timedelta(days=1)
+    return (
+        "Symbol,Date,Time,Open,High,Low,Close,Volume\n"
+        f"VCYT.US,{today},15:45:12,110.0,112.0,109.5,111.3,412000\n"
+        f"NTRA.US,{stale},22:00:00,167.0,169.0,166.5,168.42,3100000\n"
+        "GH.US,N/D,N/D,N/D,N/D,N/D,N/D,N/D\n"
+    )
+
+
+# dates are decorative — the provider reads Close/Volume sequentially
+STOOQ_HISTORY_CSV = "Date,Open,High,Low,Close,Volume\n" + "\n".join(
+    f"2026-03-{i + 1:02d},0,0,0,{c},1000000" for i, c in enumerate(DAILY_CLOSES)
+)
+
+
+def stooq_handler(req: httpx.Request) -> httpx.Response:
+    params = dict(req.url.params)
+    if req.url.path == "/q/l/":
+        assert "vcyt.us" in params["s"]  # all symbols batched into one request
+        assert params["e"] == "csv"
+        return httpx.Response(200, text=_stooq_quote_csv())
+    assert req.url.path == "/q/d/l/"
+    assert params["i"] == "d" and "d1" in params and "d2" in params
+    if params["s"].startswith("gh"):  # delisted/unknown: no history to price off either
+        return httpx.Response(200, text="Date,Open,High,Low,Close,Volume\n")
+    return httpx.Response(200, text=STOOQ_HISTORY_CSV)
+
+
+def test_stooq_provider_prices_batch_with_history_stats() -> None:
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(stooq_handler),
+    )
+    by = {q.ticker: q for q in provider.snapshot(["VCYT", "NTRA", "GH"])}
+
+    assert set(by) == {"VCYT", "NTRA"}  # the N/D row is skipped, not fatal
+    v = by["VCYT"]
+    assert v.name == "Veracyte" and v.last == 111.3
+    assert v.chg_pct == 5.0  # vs the last completed close (106.0) from history
+    assert v.volume == 412000 and v.avg_volume == 1_000_000
+    moves = [(b - a) / a * 100.0 for a, b in zip(DAILY_CLOSES, DAILY_CLOSES[1:])]
+    assert v.sigma == pytest.approx(statistics.stdev(moves[-20:]), abs=0.01)
+    # in-session with no print for today -> flat, never yesterday's move
+    n = by["NTRA"]
+    assert n.last == 168.42 and n.chg_pct == 0.0 and n.volume == 0
+
+
+def test_stooq_provider_fails_over_to_mirror_host() -> None:
+    seen: list[str] = []
+
+    def flaky_edge(req: httpx.Request) -> httpx.Response:
+        seen.append(req.url.host)
+        if req.url.host == "stooq.com":
+            return httpx.Response(404, text="not here")
+        assert req.url.host == "stooq.pl"  # the mirror picks up what .com 404'd
+        return stooq_handler(req)
+
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(flaky_edge),
+    )
+    by = {q.ticker: q for q in provider.snapshot(["VCYT"])}
+    assert by["VCYT"].last == 111.3  # served by stooq.pl
+    assert "stooq.pl" in seen
+
+
+def test_stooq_provider_prices_off_daily_close_when_live_tape_is_down() -> None:
+    """The /q/l/ light tape 404s from some egress IPs, but daily history still
+    answers — so every ticker still prices off its last completed close instead
+    of the market going dark. Between sessions that's the last close's actual
+    move ('as of close'); mid-session-but-tapeless it stays flat."""
+
+    def tape_down(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/q/l/":
+            return httpx.Response(404, text="not here")
+        assert req.url.path == "/q/d/l/"
+        return httpx.Response(200, text=STOOQ_HISTORY_CSV)
+
+    transport = httpx.MockTransport(tape_down)
+    last_session_move = round((DAILY_CLOSES[-1] / DAILY_CLOSES[-2] - 1.0) * 100, 2)
+
+    # Saturday: as of Friday's close, showing Friday's actual move (not blank).
+    weekend = StooqQuoteProvider(
+        companies=COMPANIES, throttle_s=0, backoff_s=0, now=STOOQ_WEEKEND_NOW, transport=transport
+    )
+    (q,) = weekend.snapshot(["VCYT"])
+    assert q.last == DAILY_CLOSES[-1]  # last completed daily close
+    assert q.chg_pct == last_session_move != 0.0  # the close's move, never flat-zero
+    assert q.avg_volume == 1_000_000
+
+    # Mid-session with the tape down: no fabricated move — flat at the last close.
+    in_session = StooqQuoteProvider(
+        companies=COMPANIES, throttle_s=0, backoff_s=0, now=STOOQ_SESSION_NOW, transport=transport
+    )
+    (q2,) = in_session.snapshot(["VCYT"])
+    assert q2.last == DAILY_CLOSES[-1] and q2.chg_pct == 0.0
+
+
+def test_stooq_provider_survives_history_outage() -> None:
+    def no_history(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/q/l/":
+            return httpx.Response(200, text=_stooq_quote_csv())
+        return httpx.Response(500, text="history down")
+
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(no_history),
+    )
+    (q,) = [x for x in provider.snapshot(["VCYT"]) if x.ticker == "VCYT"]
+    assert q.last == 111.3  # the price still ships
+    assert q.chg_pct == 0.0  # no prior close known -> flat, not fabricated
+    assert q.sigma == stooq_quotes.DEFAULT_SIGMA and q.avg_volume == 0
+
+
+def test_stooq_provider_raises_when_nothing_usable() -> None:
+    empty = "Symbol,Date,Time,Open,High,Low,Close,Volume\n"
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, text=empty)),
+    )
+    with pytest.raises(RuntimeError, match="no usable rows"):
+        provider.snapshot(["VCYT"])
+
+
+# ------------------------------------------------ Alpha Vantage (keyed last resort)
+
+AV_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))  # Saturday
+AV_PREMARKET_NOW = datetime(2026, 6, 10, 8, 0, tzinfo=ZoneInfo("America/New_York"))  # Wed 08:00 ET
+
+
+def _av_quote(symbol: str, price: float, prev: float, day: str, volume: int = 1_234_567) -> dict:
+    return {
+        "Global Quote": {
+            "01. symbol": symbol,
+            "05. price": str(price),
+            "06. volume": str(volume),
+            "07. latest trading day": day,
+            "08. previous close": str(prev),
+            "10. change percent": "5.0000%",
+        }
+    }
+
+
+def _av_handler(day: str):
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert "alphavantage.co" in req.url.host
+        params = dict(req.url.params)
+        assert params["function"] == "GLOBAL_QUOTE" and params["apikey"] == "test-key"
+        return httpx.Response(200, json=_av_quote(params["symbol"], 111.3, 106.0, day))
+
+    return handler
+
+
+def test_alphavantage_prices_as_of_close_with_session_move() -> None:
+    # Saturday: latest trading day is Friday -> show Friday's close AND its move.
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="test-key",
+        throttle_s=0,
+        now=AV_WEEKEND_NOW,
+        transport=httpx.MockTransport(_av_handler("2026-06-12")),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.name == "Veracyte" and q.last == 111.3
+    assert q.chg_pct == 5.0  # 111.3 vs previous close 106.0
+    assert q.volume == 1_234_567
+    assert q.avg_volume == 0 and q.sigma == alphavantage_quotes.DEFAULT_SIGMA
+
+
+def test_alphavantage_stays_flat_during_premarket() -> None:
+    # Weekday pre-market, data still stamped the prior session -> flat, no volume,
+    # never passing off yesterday's move as today's.
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="test-key",
+        throttle_s=0,
+        now=AV_PREMARKET_NOW,
+        transport=httpx.MockTransport(_av_handler("2026-06-09")),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 111.3 and q.chg_pct == 0.0 and q.volume == 0
+
+
+@pytest.mark.parametrize(
+    "env_name",
+    [
+        "ALPHAVANTAGE_API_KEY",
+        "ALPHA_VANTAGE_API_KEY",
+        "ALPHAVANTAGE_KEY",
+        "ALPHA_VANTAGE_KEY",  # the spelling that bit us in prod
+        "AV_API_KEY",
+        "AV_KEY",
+    ],
+)
+def test_alphavantage_reads_key_from_env_name_variants(monkeypatch, env_name: str) -> None:
+    # a key set under a near-miss name is the easiest way to get a silent empty
+    # strip — the provider matches the env var by its normalized name
+    for name in (
+        "ALPHAVANTAGE_API_KEY",
+        "ALPHA_VANTAGE_API_KEY",
+        "ALPHAVANTAGE_KEY",
+        "ALPHA_VANTAGE_KEY",
+        "AV_API_KEY",
+        "AV_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(env_name, "abc")
+    assert AlphaVantageQuoteProvider(companies=COMPANIES).api_key == "abc"
+
+
+def test_alphavantage_surfaces_an_invalid_key_error() -> None:
+    def bad_key(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"Error Message": "the parameter apikey is invalid or missing"})
+
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="bogus",
+        throttle_s=0,
+        now=AV_WEEKEND_NOW,
+        transport=httpx.MockTransport(bad_key),
+    )
+    # surfaced as a real error (not masked as an unknown symbol, not cached as a miss)
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["VCYT"])
+    assert "VCYT" not in alphavantage_quotes._QUOTE_CACHE  # a bad key must not poison the cache
+
+
+def test_alphavantage_requires_a_key() -> None:
+    provider = AlphaVantageQuoteProvider(companies=COMPANIES, api_key=None)
+    provider.api_key = None  # defeat any ambient ALPHAVANTAGE_API_KEY
+    with pytest.raises(RuntimeError, match="ALPHAVANTAGE_API_KEY"):
+        provider.snapshot(["VCYT"])
+
+
+def test_alphavantage_rate_limit_aborts_the_batch() -> None:
+    calls = {"n": 0}
+
+    def throttled(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, json={"Note": "5 calls per minute / 25 per day"})
+
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES,
+        api_key="test-key",
+        throttle_s=0,
+        now=AV_WEEKEND_NOW,
+        transport=httpx.MockTransport(throttled),
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["VCYT", "NTRA", "GH"])
+    assert calls["n"] == 1  # stopped after the first quota notice — spared the key
+
+
+def test_alphavantage_caches_within_ttl_to_respect_the_daily_budget() -> None:
+    calls = {"n": 0}
+
+    def counting(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return _av_handler("2026-06-12")(req)
+
+    transport = httpx.MockTransport(counting)
+    for _ in range(2):  # two refreshes, same process/day
+        provider = AlphaVantageQuoteProvider(
+            companies=COMPANIES, api_key="test-key", throttle_s=0, now=AV_WEEKEND_NOW,
+            transport=transport,
+        )
+        (q,) = provider.snapshot(["VCYT"])
+        assert q.last == 111.3
+    assert calls["n"] == 1  # second refresh served from cache, no extra request
+
+
+def test_alphavantage_skips_unknown_symbol_and_caches_the_miss() -> None:
+    calls = {"n": 0}
+
+    def empty(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, json={"Global Quote": {}})
+
+    transport = httpx.MockTransport(empty)
+    provider = AlphaVantageQuoteProvider(
+        companies=COMPANIES, api_key="test-key", throttle_s=0, now=AV_WEEKEND_NOW, transport=transport
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["ZZZZ"])
+    # a second refresh must not re-spend the daily budget on a known-dead symbol
+    again = AlphaVantageQuoteProvider(
+        companies=COMPANIES, api_key="test-key", throttle_s=0, now=AV_WEEKEND_NOW, transport=transport
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        again.snapshot(["ZZZZ"])
+    assert calls["n"] == 1  # the miss was cached
+
+
+# ----------------------------------------------------------- FMP (keyed, batched)
+
+FMP_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))  # Sat
+FMP_PREMARKET_NOW = datetime(2026, 6, 10, 8, 0, tzinfo=ZoneInfo("America/New_York"))  # Wed 08:00 ET
+FMP_FRIDAY_TS = int(datetime(2026, 6, 12, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+FMP_TUESDAY_TS = int(datetime(2026, 6, 9, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+
+
+def _fmp_row(symbol, price, prev, ts, volume=412000, avg=1_000_000) -> dict:
+    return {
+        "symbol": symbol,
+        "name": f"{symbol} Inc.",
+        "price": price,
+        "previousClose": prev,
+        "volume": volume,
+        "avgVolume": avg,
+        "timestamp": ts,
+    }
+
+
+def _fmp_handler(rows: dict[str, dict]):
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert "financialmodelingprep.com" in req.url.host
+        assert dict(req.url.params)["apikey"] == "fmp-test"
+        requested = req.url.path.rsplit("/", 1)[-1].upper().split(",")  # batched in the path
+        return httpx.Response(200, json=[rows[s] for s in requested if s in rows])
+
+    return handler
+
+
+def test_fmp_prices_batch_with_rvol_inputs() -> None:
+    rows = {
+        "VCYT": _fmp_row("VCYT", 111.3, 106.0, FMP_FRIDAY_TS),
+        "NTRA": _fmp_row("NTRA", 168.42, 170.0, FMP_FRIDAY_TS, volume=900000, avg=1_800_000),
+    }
+    provider = FmpQuoteProvider(
+        companies=COMPANIES,
+        api_key="fmp-test",
+        now=FMP_WEEKEND_NOW,
+        transport=httpx.MockTransport(_fmp_handler(rows)),
+    )
+    by = {q.ticker: q for q in provider.snapshot(["VCYT", "NTRA"])}
+    # weekend -> show the last session's close, its move and volume
+    assert by["VCYT"].name == "Veracyte" and by["VCYT"].last == 111.3
+    assert by["VCYT"].chg_pct == 5.0  # 111.3 vs previous close 106.0
+    # unlike the other keyed tiers, FMP carries volume + avg_volume -> RVOL
+    assert by["VCYT"].volume == 412000 and by["VCYT"].avg_volume == 1_000_000
+    assert by["VCYT"].sigma == fmp_quotes.DEFAULT_SIGMA
+    assert by["NTRA"].chg_pct == round((168.42 / 170.0 - 1) * 100, 2)
+
+
+def test_fmp_stays_flat_during_premarket() -> None:
+    # Wed pre-market, data stamped the prior session -> flat, no volume; but the
+    # trailing average still rides along so RVOL stays available.
+    rows = {"VCYT": _fmp_row("VCYT", 111.3, 106.0, FMP_TUESDAY_TS)}
+    provider = FmpQuoteProvider(
+        companies=COMPANIES,
+        api_key="fmp-test",
+        now=FMP_PREMARKET_NOW,
+        transport=httpx.MockTransport(_fmp_handler(rows)),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 111.3 and q.chg_pct == 0.0 and q.volume == 0
+    assert q.avg_volume == 1_000_000
+
+
+def test_fmp_surfaces_an_error_body() -> None:
+    # FMP returns plan/limit errors as a JSON object, not the success array.
+    provider = FmpQuoteProvider(
+        companies=COMPANIES,
+        api_key="bogus",
+        now=FMP_WEEKEND_NOW,
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(200, json={"Error Message": "Limit Reach. Upgrade."})
+        ),
+    )
+    with pytest.raises(RuntimeError, match="FMP rejected"):
+        provider.snapshot(["VCYT"])
+
+
+def test_fmp_reads_key_from_env_name_variants(monkeypatch) -> None:
+    for name in ("FMP_KEY", "FMP_API_KEY", "FINANCIALMODELINGPREP_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FMP_KEY", "k")  # the spelling set in prod
+    assert FmpQuoteProvider(companies=COMPANIES).api_key == "k"
+
+
+# ---------------------------------------------------- Finnhub (keyed, per-ticker)
+
+FINNHUB_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))
+FINNHUB_PREMARKET_NOW = datetime(2026, 6, 10, 8, 0, tzinfo=ZoneInfo("America/New_York"))
+FINNHUB_FRIDAY_TS = int(datetime(2026, 6, 12, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+FINNHUB_TUESDAY_TS = int(datetime(2026, 6, 9, 16, 0, tzinfo=ZoneInfo("America/New_York")).timestamp())
+
+
+def _finnhub_handler(price=111.3, prev=106.0, ts=FINNHUB_FRIDAY_TS):
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert "finnhub.io" in req.url.host
+        params = dict(req.url.params)
+        assert params["token"] == "fh-test"
+        if params["symbol"] == "ZZZZ":  # unknown symbol -> all-zeros body
+            return httpx.Response(200, json={"c": 0, "d": None, "dp": None, "pc": 0, "t": 0})
+        return httpx.Response(
+            200,
+            json={"c": price, "d": price - prev, "dp": 5.0, "h": price, "l": prev, "o": prev, "pc": prev, "t": ts},
+        )
+
+    return handler
+
+
+def test_finnhub_prices_as_of_close_with_session_move() -> None:
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_WEEKEND_NOW,
+        transport=httpx.MockTransport(_finnhub_handler()),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.name == "Veracyte" and q.last == 111.3 and q.chg_pct == 5.0
+    assert q.volume == 0 and q.avg_volume == 0  # /quote has no volume
+    assert q.sigma == finnhub_quotes.DEFAULT_SIGMA
+
+
+def test_finnhub_stays_flat_during_premarket() -> None:
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_PREMARKET_NOW,
+        transport=httpx.MockTransport(_finnhub_handler(ts=FINNHUB_TUESDAY_TS)),
+    )
+    (q,) = provider.snapshot(["VCYT"])
+    assert q.last == 111.3 and q.chg_pct == 0.0  # never yesterday's move pre-open
+
+
+def test_finnhub_skips_unknown_symbol() -> None:
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_WEEKEND_NOW,
+        transport=httpx.MockTransport(_finnhub_handler()),
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["ZZZZ"])
+
+
+def test_finnhub_rate_limit_aborts_the_batch() -> None:
+    calls = {"n": 0}
+
+    def throttled(req: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(429, json={"error": "API limit reached"})
+
+    provider = FinnhubQuoteProvider(
+        companies=COMPANIES,
+        api_key="fh-test",
+        throttle_s=0,
+        now=FINNHUB_WEEKEND_NOW,
+        transport=httpx.MockTransport(throttled),
+    )
+    with pytest.raises(RuntimeError, match="no usable quotes"):
+        provider.snapshot(["VCYT", "NTRA", "GH"])
+    assert calls["n"] == 1  # stopped after the first 429 — spared the key
+
+
+def test_finnhub_reads_key_from_env_name_variants(monkeypatch) -> None:
+    for name in ("FINNHUB_KEY", "FINHUB_KEY", "FINNHUB_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FINHUB_KEY", "k")  # the (mis)spelling set in prod
+    assert FinnhubQuoteProvider(companies=COMPANIES).api_key == "k"
+
+
+# ------------------------------------------------------------- quote vendor chain
+
+
+class _BoomQuotes(QuoteProvider):
+    def snapshot(self, tickers: list[str]) -> list[Quote]:
+        raise RuntimeError("primary down")
+
+
+class _CannedQuotes(QuoteProvider):
+    def snapshot(self, tickers: list[str]) -> list[Quote]:
+        return [
+            Quote(ticker=t, name=t, last=1.0, chg_pct=0.0, volume=1, avg_volume=1, sigma=3.0)
+            for t in tickers
+        ]
+
+
+def test_fallback_chain_uses_backup_when_primary_fails() -> None:
+    quotes = FallbackQuoteProvider(_BoomQuotes(), _CannedQuotes()).snapshot(["VCYT"])
+    assert [q.ticker for q in quotes] == ["VCYT"]
+
+
+def test_fallback_chain_reports_every_vendors_failure() -> None:
+    with pytest.raises(RuntimeError, match="all quote vendors failed.*primary down"):
+        FallbackQuoteProvider(_BoomQuotes(), _BoomQuotes()).snapshot(["VCYT"])

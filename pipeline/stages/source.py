@@ -15,7 +15,9 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel
 
 from pipeline.contracts import Quote, RawItem, SourceHealth, UniverseConfig
+from pipeline.market_hours import is_quiet_period
 from pipeline.providers.registry import ProviderSet
+from pipeline.providers.util import is_probably_english
 
 _SOURCE_RANK = {"edgar": 0, "rss": 1, "news": 2}  # keep the most primary copy
 
@@ -43,6 +45,15 @@ def _is_dupe(a: RawItem, b: RawItem) -> bool:
     return SequenceMatcher(None, _norm_title(a.title), _norm_title(b.title)).ratio() >= 0.90
 
 
+def drop_non_english(items: list[RawItem]) -> list[RawItem]:
+    """Keep only items whose headline reads as English. Real RSS feeds and the
+    Exa news search routinely return foreign-language stories; the brief (and
+    the rule-based summary, which echoes raw text verbatim) is English-only, so
+    we filter here — the one chokepoint feeding every downstream stage. The
+    gate is conservative: it drops the clearly-foreign and keeps the unsure."""
+    return [i for i in items if is_probably_english(i.title, i.raw_text)]
+
+
 def dedupe(items: list[RawItem]) -> list[RawItem]:
     """URL + fuzzy-title dedupe. Keeps the most primary source (EDGAR > RSS >
     news), then the earliest timestamp; merges ticker_guess when missing."""
@@ -65,6 +76,7 @@ def _health(
     error: Exception | None,
     now: datetime,
     stale_after: timedelta,
+    quiet: bool,
 ) -> SourceHealth:
     if error is not None:
         return SourceHealth(
@@ -74,23 +86,30 @@ def _health(
             detail=f"{type(error).__name__}: {error}",
         )
     last_ts = max((i.ts for i in items), default=None)
-    if last_ts is None or now - last_ts > stale_after:
-        if last_ts is None:
-            detail = f"no {provider.upper()} items pulled this run — feed may be down"
-        else:
-            mins = int((now - last_ts).total_seconds() // 60)
-            detail = f"newest {provider.upper()} pull is {mins} min old — feed may be stale"
-        return SourceHealth(
-            provider=provider,  # type: ignore[arg-type]
-            status="stale",
-            last_ts=last_ts,
-            detail=detail,
+    overdue = last_ts is None or now - last_ts > stale_after
+    if overdue and quiet:
+        # Between sessions a slow feed is expected, not a fault — report it
+        # healthy. detail is left for the UI to synthesize ("last pull <t>")
+        # except the empty case, which has no timestamp to render.
+        detail = (
+            None
+            if last_ts is not None
+            else f"No new {provider.upper()} items — quiet between sessions"
         )
+        return SourceHealth(provider=provider, status="ok", last_ts=last_ts, detail=detail)  # type: ignore[arg-type]
+    if overdue:
+        # Inside the pre-market/session window a quiet feed IS the alarm. detail
+        # stays None so the dashboard renders its live "N min old" phrasing.
+        return SourceHealth(provider=provider, status="stale", last_ts=last_ts, detail=None)  # type: ignore[arg-type]
     return SourceHealth(provider=provider, status="ok", last_ts=last_ts, detail=None)  # type: ignore[arg-type]
 
 
 def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) -> SourceResult:
     stale_after = timedelta(minutes=universe.thresholds.stale_after_min)
+    # Between sessions (weekends/overnight) a quiet tape is expected, so health
+    # softens its alarms; the strict pre-market checks apply only when fresh
+    # data is actually due.
+    quiet = is_quiet_period(now)
     calls = {
         "rss": lambda: providers.rss.fetch(universe.rss_feeds),
         "edgar": lambda: providers.edgar.fetch(universe.tickers),
@@ -119,7 +138,10 @@ def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) 
     # (= generated_at). Enforced here so it holds for every downstream stage.
     fresh = [i for items in raw.values() for i in items if i.ts <= now]
 
-    items = dedupe(fresh)
+    # Drop non-English headlines before dedupe/brief. Health (below) is measured
+    # on the look-ahead set, not this one, so a foreign-heavy feed still reports
+    # its true connectivity rather than reading as stale.
+    items = dedupe(drop_non_english(fresh))
     quotes = [
         q.model_copy(
             update={"rvol": round(q.volume / q.avg_volume, 2) if q.avg_volume else None}
@@ -128,25 +150,46 @@ def run_source(universe: UniverseConfig, providers: ProviderSet, now: datetime) 
     ]
 
     health = [
-        _health(name, [i for i in raw[name] if i.ts <= now], errors[name], now, stale_after)
+        _health(name, [i for i in raw[name] if i.ts <= now], errors[name], now, stale_after, quiet)
         for name in ("rss", "edgar", "news")
     ]
-    if quote_error is not None:
-        health.append(
-            SourceHealth(
-                provider="quotes",
-                status="failed",
-                last_ts=None,
-                detail=f"{type(quote_error).__name__}: {quote_error}",
-            )
-        )
-    else:
-        health.append(
-            SourceHealth(
-                provider="quotes",
-                status="ok" if quotes else "stale",
-                last_ts=now if quotes else None,
-                detail=None if quotes else "snapshot returned no tickers",
-            )
-        )
+    health.append(_quote_health(quotes, quote_error, now, quiet))
     return SourceResult(items=items, quotes=quotes, health=health)
+
+
+def _quote_health(
+    quotes: list[Quote], error: Exception | None, now: datetime, quiet: bool
+) -> SourceHealth:
+    """Quote health in the product's voice. The per-vendor reason is surfaced
+    (concisely — the noisy prefix stripped) so a headless deploy is debuggable
+    from the rail alone. Between sessions there is no pre-market tape to expect,
+    so an outage is a soft amber, not a red ✕."""
+    if error is not None:
+        reason = _quote_failure_reason(error)
+        if quiet:
+            return SourceHealth(
+                provider="quotes",
+                status="stale",
+                last_ts=None,
+                detail=f"No live quotes between sessions — {reason}",
+            )
+        return SourceHealth(
+            provider="quotes",
+            status="failed",
+            last_ts=None,
+            detail=f"Live market data unavailable — {reason}",
+        )
+    if quotes:
+        return SourceHealth(provider="quotes", status="ok", last_ts=now, detail=None)
+    if quiet:
+        return SourceHealth(
+            provider="quotes", status="ok", last_ts=None, detail="No quotes — quiet between sessions"
+        )
+    return SourceHealth(provider="quotes", status="stale", last_ts=None, detail=None)
+
+
+def _quote_failure_reason(error: Exception, limit: int = 240) -> str:
+    """Concise per-vendor reason for the rail: the chain lists why each vendor
+    failed; drop the boilerplate prefix and cap the length."""
+    msg = str(error).replace("all quote vendors failed — ", "").strip()
+    return msg if len(msg) <= limit else msg[: limit - 1] + "…"

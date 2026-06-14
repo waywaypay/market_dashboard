@@ -41,3 +41,12 @@ services:
         sync: false # set in dashboard
       - key: ANTHROPIC_API_KEY
         sync: false # set in dashboard (enables the real classifier via BRIEF_CLASSIFIER=auto)
+      # Optional keyed quote tiers. Yahoo + Stooq are keyless, but a shared
+      # cloud egress IP is often blocked by both; a keyed tier answers from
+      # those IPs. Any one is enough (chain order FMP -> Finnhub -> AV).
+      - key: FMP_KEY
+        sync: false # financialmodelingprep.com — batched quote w/ volume (RVOL), 250 req/day free
+      - key: FINNHUB_KEY
+        sync: false # finnhub.io — per-ticker quote, 60 req/min free
+      - key: ALPHAVANTAGE_API_KEY
+        sync: false # alphavantage.co — GLOBAL_QUOTE, 25 req/day free (last resort)

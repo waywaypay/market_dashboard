@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Header } from "./components/Header";
+import { DataModeBanner } from "./components/DataModeBanner";
 import { TheRead } from "./components/TheRead";
 import { MarketStrip } from "./components/MarketStrip";
 import { PrioritySignals } from "./components/PrioritySignals";
@@ -15,6 +16,7 @@ import { ByCompany } from "./components/ByCompany";
 import { SectorHeadlines } from "./components/SectorHeadlines";
 import { RightRail } from "./components/RightRail";
 import { EmailModal } from "./components/EmailModal";
+import { VisualizeModal } from "./components/VisualizeModal";
 import type { DailyBrief, Item, UniverseEntry } from "./lib/contracts";
 import { loadBrief, loadUniverses, refreshPipeline } from "./lib/loadBrief";
 
@@ -36,6 +38,7 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [minMateriality, setMinMateriality] = useState(1);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [visualizeOpen, setVisualizeOpen] = useState(false);
 
   const fetchBrief = useCallback(async (universeId?: string) => {
     setRefreshing(true);
@@ -59,6 +62,18 @@ export default function App() {
     loadUniverses().then(setUniverses);
     void fetchBrief();
   }, [fetchBrief]);
+
+  // A fresh deploy has no artifact until the boot refresh lands (the server
+  // answers 503 + status meanwhile) — keep retrying so the cockpit appears
+  // on its own the moment real data exists.
+  useEffect(() => {
+    if (state.phase !== "error") return;
+    const t = setInterval(() => {
+      void fetchBrief();
+      loadUniverses().then(setUniverses);
+    }, 6000);
+    return () => clearInterval(t);
+  }, [state.phase, fetchBrief]);
 
   // ↻ = re-run the pipeline (where a server exists), then re-read the artifact
   const hardRefresh = useCallback(
@@ -98,12 +113,14 @@ export default function App() {
     return (
       <Shell>
         <div className="mx-auto max-w-[640px] px-6 py-16">
-          <h1 className="font-display text-lg font-semibold text-ink">No brief to read.</h1>
+          <h1 className="font-display text-lg font-semibold text-ink">No brief to read yet.</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            The artifact didn't load ({state.phase === "error" ? state.message : "unknown"}).
-            Run <code className="num rounded-sm bg-ink/5 px-1 py-0.5">make run-pipeline</code>{" "}
-            to generate <code className="num rounded-sm bg-ink/5 px-1 py-0.5">web/public/brief.json</code>,
-            then refresh.
+            {state.phase === "error" ? state.message : "The artifact didn't load."}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            Retrying automatically — a deploy's first refresh lands within a couple of
+            minutes. Running locally? Generate the artifact with{" "}
+            <code className="num rounded-sm bg-ink/5 px-1 py-0.5">make run-pipeline</code>.
           </p>
         </div>
       </Shell>
@@ -125,6 +142,7 @@ export default function App() {
         onRefresh={() => void hardRefresh(brief.universe_id)}
         refreshing={refreshing}
       />
+      <DataModeBanner brief={brief} />
       <TheRead brief={brief} />
 
       <div className="mx-auto flex max-w-[1400px] flex-col gap-0 lg:flex-row lg:gap-6 lg:px-6">
@@ -134,6 +152,7 @@ export default function App() {
             hoverTicker={hoverTicker}
             hoverItemId={hoverItemId}
             onHover={onTileHover}
+            onVisualize={() => setVisualizeOpen(true)}
           />
           <div id="signals">
             <PrioritySignals
@@ -168,6 +187,9 @@ export default function App() {
       </div>
 
       {emailOpen && <EmailModal brief={brief} onClose={() => setEmailOpen(false)} />}
+      {visualizeOpen && (
+        <VisualizeModal brief={brief} onClose={() => setVisualizeOpen(false)} />
+      )}
     </div>
   );
 }

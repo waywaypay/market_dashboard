@@ -9,7 +9,11 @@ One process does everything the local `make dev` split does:
     a redeploy
   * POST /api/ship     -> re-render + send the First Read for a universe
   * POST /api/refresh  -> re-run the pipeline now (the dashboard's ↻ button)
+  * GET  /api/status   -> last refresh outcome (running/ok/failed + why)
   * GET  /healthz      -> 200 for platform health checks
+  * a missing artifact answers 503 with the refresh status instead of 404 —
+    the dashboard shows "first refresh running/failed: <why>", never a blank
+    page and never stale demo data (fixture artifacts are not committed)
   * refreshes the artifact at boot and every BRIEF_REFRESH_MINUTES (default
     30; 0 disables) — emails are never sent by scheduled refreshes, only by
     the explicit ship action
@@ -44,6 +48,29 @@ ARTIFACT_PREFIXES = ("/brief.json", "/briefs/", "/universes.json")
 
 _refresh_lock = threading.Lock()
 
+# Last refresh outcome, served by /api/status and attached to artifact-miss
+# responses so the UI can say WHY there is no data yet instead of rendering
+# nothing (or worse, something synthetic).
+_refresh_state_lock = threading.Lock()
+_refresh_state = {
+    "status": "pending",  # pending|running|ok|failed
+    "detail": "no refresh has run yet",
+    "at": None,  # ISO timestamp of the last completed refresh
+}
+
+
+def _set_refresh_state(status: str, detail: str, stamp: bool = False) -> None:
+    with _refresh_state_lock:
+        _refresh_state["status"] = status
+        _refresh_state["detail"] = detail
+        if stamp:
+            _refresh_state["at"] = datetime.now(timezone.utc).isoformat()
+
+
+def refresh_status() -> dict:
+    with _refresh_state_lock:
+        return dict(_refresh_state)
+
 # Self-healing web build: when a deploy's build command didn't compile the
 # dashboard (e.g. a manually-created Render service left on `poetry install`),
 # the server builds it at boot instead of 503ing forever. Costs ~a minute on
@@ -68,29 +95,46 @@ MIME = {
 
 def refresh_artifacts() -> dict:
     """Re-run the deterministic pipeline for every universe. Never raises —
-    the server must stay up even when a scheduled run fails."""
+    the server must stay up even when a scheduled run fails. One universe
+    crashing must not block the rest, so each gets its own try/except."""
     from pipeline.contracts.universe import discover_universes, load_universe
     from pipeline.orchestrator import run_universe
 
     if not _refresh_lock.acquire(blocking=False):
         return {"ok": False, "detail": "a refresh is already running"}
     try:
+        _set_refresh_state("running", "refresh in progress")
         now = datetime.now(timezone.utc)
-        ids = []
+        done: list[str] = []
+        failed: list[str] = []
         for n, path in enumerate(discover_universes(REPO / "universes")):
             universe = load_universe(path)
-            run_universe(
-                universe,
-                now=now,
-                web_public=PUBLIC,
-                default=(n == 0),
-                send_email=False,  # email leaves only via the explicit ship action
-            )
-            ids.append(universe.id)
-        return {"ok": True, "detail": f"refreshed {', '.join(ids)} at {now.isoformat()}"}
+            try:
+                run_universe(
+                    universe,
+                    now=now,
+                    web_public=PUBLIC,
+                    default=(n == 0),
+                    send_email=False,  # email leaves only via the explicit ship action
+                )
+                done.append(universe.id)
+            except Exception as exc:
+                traceback.print_exc()
+                failed.append(f"{universe.id}: {type(exc).__name__}: {exc}")
+        if failed:
+            detail = f"refresh failed for {'; '.join(failed)}"
+            if done:
+                detail += f" (refreshed {', '.join(done)})"
+            _set_refresh_state("failed", detail, stamp=True)
+            return {"ok": False, "detail": detail}
+        detail = f"refreshed {', '.join(done)} at {now.isoformat()}"
+        _set_refresh_state("ok", detail, stamp=True)
+        return {"ok": True, "detail": detail}
     except Exception as exc:
         traceback.print_exc()
-        return {"ok": False, "detail": f"refresh failed: {type(exc).__name__}: {exc}"}
+        detail = f"refresh failed: {type(exc).__name__}: {exc}"
+        _set_refresh_state("failed", detail, stamp=True)
+        return {"ok": False, "detail": detail}
     finally:
         _refresh_lock.release()
 
@@ -205,8 +249,28 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/healthz":
             self._send(200, "text/plain; charset=utf-8", b"ok")
             return
+        if self.path.split("?", 1)[0] == "/api/status":
+            self._send_json(200, {"ok": True, "refresh": refresh_status()})
+            return
         target = resolve_static(self.path)
         if target is None:
+            if self.path.split("?", 1)[0].startswith(ARTIFACT_PREFIXES):
+                # No artifact on disk (fixture artifacts are not committed, so
+                # a fresh deploy has none until the first real refresh lands).
+                # Tell the dashboard what's happening instead of 404ing.
+                state = refresh_status()
+                self._send_json(
+                    503,
+                    {
+                        "ok": False,
+                        "detail": (
+                            "no artifact generated yet — "
+                            f"refresh {state['status']}: {state['detail']}"
+                        ),
+                        "refresh": state,
+                    },
+                )
+                return
             if not (DIST / "index.html").is_file():
                 ensure_web_built()  # self-heal under-configured deploys
                 status, body = _not_built_page()

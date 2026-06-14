@@ -97,6 +97,14 @@ class SourceHealth(BaseModel):
     detail: Optional[str] = None  # written in the product's own voice
 
 
+class PricePoint(BaseModel):
+    """One daily close for the historical price-overlay chart. Keys are kept
+    short (`d`, `c`) because this ships ~60 sessions x every ticker."""
+
+    d: str  # ISO date, YYYY-MM-DD
+    c: float  # close
+
+
 class Counts(BaseModel):
     total_items: int
     hot_items: int  # materiality >= thresholds.hot_materiality
@@ -129,3 +137,15 @@ class DailyBrief(BaseModel):
     categories: list[str]  # ordered; UI maps index -> category color
     display_tz: str  # IANA tz for rendering timestamps (delivery.tz)
     classifier_engine: str  # "fixture" | "rules" | "anthropic" (provenance)
+
+    # -- data provenance: which providers actually produced this brief. The
+    #    dashboard banners anything that is not fully real, so synthetic demo
+    #    data can never pass for live market data. Defaults are the honest
+    #    direction: an artifact predating these fields reads as fixture. --
+    data_mode: Literal["real", "fixture", "mixed"] = "fixture"
+    provider_modes: dict[str, str] = Field(default_factory=dict)  # source -> fixture|real
+
+    # -- historical daily closes per ticker for the overlay chart. Best-effort
+    #    and presentation-only (empty when no history source is reachable);
+    #    ascending by date. Defaults empty so older artifacts still validate. --
+    history: dict[str, list[PricePoint]] = Field(default_factory=dict)

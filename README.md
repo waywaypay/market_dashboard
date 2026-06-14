@@ -76,7 +76,7 @@ Every external dependency sits behind a typed interface in
 | `RSSProvider`        | synthetic feed items               | **`HttpRSSProvider` (working)** — feed URLs in the YAML   |
 | `EdgarProvider`      | synthetic 8-Ks                     | **`SecEdgarProvider` (working)** — free SEC submissions API|
 | `NewsProvider`       | synthetic search results           | **`ExaNewsProvider` (working)** — Exa semantic news search|
-| `QuoteProvider`      | seeded pre-market snapshot         | **`YahooQuoteProvider` (working)** — keyless Yahoo charts |
+| `QuoteProvider`      | seeded pre-market snapshot         | **Yahoo → Stooq → FMP → Finnhub → Alpha Vantage chain (working)** — keyless first, keyed tiers when their keys are set |
 | `ClassifierProvider` | canned labels + rule-based backup  | `AnthropicClassifierProvider` (working)                   |
 | `EmailProvider`      | writes `.html` to `out/emails/`    | `SmtpEmailProvider` (stub + TODO)                         |
 
@@ -93,6 +93,11 @@ rendered in the rail), not crashes.
 export SEC_EDGAR_USER_AGENT="yourapp/1.0 you@example.com"  # SEC fair-access policy
 export EXA_API_KEY="..."                                   # https://exa.ai
 export ANTHROPIC_API_KEY="..."                             # real classification
+# optional keyed quote tiers (any one suffices; they answer from cloud IPs the
+# keyless vendors get blocked on):
+export FMP_KEY="..."                                       # financialmodelingprep.com (batched, RVOL)
+export FINNHUB_KEY="..."                                   # finnhub.io (60 req/min)
+export ALPHAVANTAGE_API_KEY="..."                          # alphavantage.co (25 req/day)
 
 BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
 ```
@@ -109,19 +114,43 @@ BRIEF_PROVIDERS=real BRIEF_EMAIL=fixture make run-pipeline
   `category: news` and a published-date window (`EXA_LOOKBACK_HOURS`, default
   36; `EXA_NUM_RESULTS` per query, default 10). Undated results are dropped —
   they can't pass the no-look-ahead gate.
-* **Quotes (Yahoo)** — no key needed. Primary path: ONE batched v7 quote
-  call per refresh prices the whole universe (pre/post-market price,
-  previous close, day volume, 3-month average volume), behind a
-  cookie+crumb handshake done once per process. `sigma` (stdev of the last
-  `QUOTES_TRAILING_DAYS` daily % moves, default 20) comes from per-ticker
-  daily history, cached per UTC day and best-effort — a throttled history
-  call degrades to a conservative default instead of dropping the ticker.
-  If the handshake fails, a per-ticker chart fallback rebuilds the same
-  quote. RVOL and unusual-move flags stay derived in the fuse stage.
-  Yahoo rate-limits shared cloud IPs, so requests are paced and 429s get a
-  capped exponential backoff honoring `Retry-After`. If it still
-  misbehaves, mix back with `BRIEF_QUOTES=fixture` while you pick a paid
-  vendor.
+* **Quotes (Yahoo → Stooq → Alpha Vantage chain)** — no keys needed for the
+  first two tiers. Yahoo is primary: ONE
+  batched v7 quote call per refresh prices the whole universe (pre/post-
+  market price, previous close, day volume, 3-month average volume) behind
+  a cookie+crumb handshake done once per process; `sigma` (stdev of the
+  last `QUOTES_TRAILING_DAYS` daily % moves, default 20) comes from
+  per-ticker daily history, cached per UTC day and best-effort. A
+  per-ticker chart fallback covers handshake failures. When Yahoo
+  rate-limits the host's shared egress IP entirely (HTTP 429 — common on
+  free cloud tiers), the chain falls back to **Stooq**: real exchange data
+  over keyless CSV (with `stooq.com`↔`stooq.pl` mirror failover). Stooq's
+  daily-history endpoint is the workhorse and stays reachable even from IPs
+  that 404 its light-quote tape, so the live tape is treated as a bonus:
+  when it answers we show the delayed intraday print, otherwise every ticker
+  still prices off its last completed daily close — the market is never left
+  blank. With the session shut (weekend/holiday/overnight) that close is
+  shown with its own move ("as of close", the convention every finance UI
+  uses); during a trading day still awaiting the first print it stays flat,
+  never passing off a prior session's move as today's. The next refresh
+  retries Yahoo first, so pre-market quality restores itself. Requests are
+  paced with capped, `Retry-After`-honoring backoff and a hard time budget
+  (`QUOTES_DEADLINE_S`, default 120s). RVOL and unusual-move flags stay
+  derived in the fuse stage. When both keyless tiers are blocked at the host
+  IP (some cloud egress IPs are banned by Yahoo *and* Stooq), set a **keyed
+  tier** — these answer from datacenter IPs the keyless vendors reject. Any
+  one suffices; when several keys are present they chain in this order:
+  **FMP** (`FMP_KEY`; one batched call prices the whole universe with price,
+  previous close, volume *and* average volume, so it yields RVOL — free tier
+  250 req/day), then **Finnhub** (`FINNHUB_KEY`; per-ticker price + close
+  move, generous 60 req/min, no volume), then **Alpha Vantage**
+  (`ALPHAVANTAGE_API_KEY`; `GLOBAL_QUOTE`, last price + close move, strict 25
+  req/day so results cache per ticker for `ALPHAVANTAGE_TTL_S`, default 12h,
+  and quota notices abort the batch). Keys are matched by *normalized* env-var
+  name (`FINHUB_KEY`, `FMP_API_KEY`, … all resolve), since a near-miss name is
+  the easiest way to silently get an empty strip. Each keyed tier honors the
+  same as-of-close/flat-pre-market rule; none carries trailing history, so
+  `sigma` falls back to a conservative default.
 * **Classifier** — `BRIEF_CLASSIFIER=auto` (default) uses Claude when
   `ANTHROPIC_API_KEY` is set, else fixtures — same eval gates either way.
 
@@ -213,7 +242,11 @@ secrets in the Render dashboard:
 `EXA_API_KEY` (news search shows "failed" in the rail until then) and
 `ANTHROPIC_API_KEY` (classification falls back to rule-based tagging until
 then); also set `SEC_EDGAR_USER_AGENT` to your contact per SEC fair-access
-policy. Note the service is public by default and the ship/refresh endpoints
+policy. If the deploy's egress IP is banned by *both* keyless quote vendors
+(Yahoo and Stooq), set `ALPHAVANTAGE_API_KEY` to add the keyed quote tier so
+the market strip still fills (the name is matched flexibly — `ALPHA_VANTAGE_KEY`,
+`AV_KEY`, etc. all resolve). Note the service is public by default and the
+ship/refresh endpoints
 are unauthenticated (auth is out of scope by design) — keep the URL private
 or put Render's access controls in front of it.
 

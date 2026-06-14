@@ -57,6 +57,9 @@ class ProviderSet:
     quotes: QuoteProvider
     classifier: ClassifierProvider
     email: EmailProvider
+    # source -> "fixture"|"real", recorded at build time so the brief can
+    # carry its own provenance (DailyBrief.data_mode / provider_modes)
+    modes: dict[str, str]
 
 
 def _anthropic_available() -> bool:
@@ -111,9 +114,42 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
         return ExaNewsProvider(companies=universe.companies, watch=universe.private_watch)
 
     def real_quotes() -> QuoteProvider:
+        from pipeline.providers.fallback import FallbackQuoteProvider
+        from pipeline.providers.stooq_quotes import StooqQuoteProvider
         from pipeline.providers.yahoo_quotes import YahooQuoteProvider
 
-        return YahooQuoteProvider(companies=universe.companies)
+        # Yahoo first (pre-market tape); Stooq is the keyless real-data
+        # fallback for when Yahoo rate-limits the host's shared egress IP.
+        # Stooq takes the run clock so its as-of-close move tracks `now`.
+        chain: list[QuoteProvider] = [
+            YahooQuoteProvider(companies=universe.companies),
+            StooqQuoteProvider(companies=universe.companies, now=now),
+        ]
+        # Keyed tiers that answer from cloud IPs the keyless vendors get blocked
+        # on. Each only joins the chain when its key is present (matched by
+        # normalized env-var name). Ordered by data richness then budget:
+        # FMP (batched, carries volume -> RVOL, 250/day), Finnhub (price only,
+        # 60/min), Alpha Vantage (price only, 25/day — the tiny last resort).
+        from pipeline.providers.fmp_quotes import (
+            FmpQuoteProvider,
+            api_key_from_env as fmp_key,
+        )
+        from pipeline.providers.finnhub_quotes import (
+            FinnhubQuoteProvider,
+            api_key_from_env as finnhub_key,
+        )
+        from pipeline.providers.alphavantage_quotes import (
+            AlphaVantageQuoteProvider,
+            api_key_from_env as alphavantage_key,
+        )
+
+        if fmp_key():
+            chain.append(FmpQuoteProvider(companies=universe.companies, now=now))
+        if finnhub_key():
+            chain.append(FinnhubQuoteProvider(companies=universe.companies, now=now))
+        if alphavantage_key():
+            chain.append(AlphaVantageQuoteProvider(companies=universe.companies, now=now))
+        return FallbackQuoteProvider(*chain)
 
     def real_email() -> EmailProvider:
         from pipeline.providers.real_stubs import SmtpEmailProvider
@@ -127,4 +163,5 @@ def build_providers(universe: UniverseConfig, now: datetime) -> ProviderSet:
         quotes=_pick("QUOTES", lambda: FixtureQuoteProvider(uid, now), real_quotes),
         classifier=build_classifier(uid),
         email=_pick("EMAIL", lambda: FixtureEmailProvider(), real_email),
+        modes={name.lower(): _mode(name) for name in ("RSS", "EDGAR", "NEWS", "QUOTES", "EMAIL")},
     )
