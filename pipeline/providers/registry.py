@@ -68,14 +68,31 @@ def _anthropic_available() -> bool:
     )
 
 
+def _venice_available() -> bool:
+    from pipeline.providers.venice_classifier import api_key_from_env
+
+    return bool(api_key_from_env())
+
+
 def build_classifier(universe_id: str) -> ClassifierProvider:
     mode = os.environ.get("BRIEF_CLASSIFIER", "auto").lower()
     if mode == "auto":
-        mode = "anthropic" if _anthropic_available() else "fixture"
+        # Prefer Claude. Direct Anthropic wins when keyed; otherwise Claude via
+        # Venice (VENICE_API_KEY); else the keyless fixture classifier.
+        if _anthropic_available():
+            mode = "anthropic"
+        elif _venice_available():
+            mode = "venice"
+        else:
+            mode = "fixture"
     if mode == "anthropic":
         from pipeline.providers.anthropic_classifier import AnthropicClassifierProvider
 
         return AnthropicClassifierProvider()
+    if mode == "venice":
+        from pipeline.providers.venice_classifier import VeniceClassifierProvider
+
+        return VeniceClassifierProvider()
     if mode == "rules":
         return RulesClassifierProvider()
     if mode == "fixture":

@@ -41,6 +41,10 @@ services:
         sync: false # set in dashboard
       - key: ANTHROPIC_API_KEY
         sync: false # set in dashboard (enables the real classifier via BRIEF_CLASSIFIER=auto)
+      - key: VENICE_API_KEY
+        sync: false # alternative to ANTHROPIC_API_KEY: runs a Claude model via
+        # Venice for classification (auto-selected when ANTHROPIC_API_KEY is
+        # unset). Model via BRIEF_VENICE_CLASSIFIER_MODEL (default claude-sonnet-4-6).
       # Optional keyed quote tiers. Yahoo + Stooq are keyless, but a shared
       # cloud egress IP is often blocked by both; a keyed tier answers from
       # those IPs. Any one is enough (chain order FMP -> Finnhub -> AV).
