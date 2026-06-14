@@ -163,7 +163,12 @@ class VeniceClassifierProvider(ClassifierProvider):
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                "max_tokens": 16000,  # headroom so a full-universe batch never truncates
+                # Output budget. Venice reserves worst-case cost (input +
+                # max_tokens × output price) against the balance up front, and a
+                # daily Diem allowance is small — so keep this lean. A full batch
+                # of compact per-item JSON lands well under this; truncation is
+                # caught by retry → rules fallback anyway.
+                "max_tokens": 4000,
                 "temperature": 0,  # classification wants determinism, not creativity
                 # Venice prepends its own system prompt by default; suppress it so
                 # our strict-JSON instruction fully controls the output.
