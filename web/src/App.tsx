@@ -38,7 +38,9 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [minMateriality, setMinMateriality] = useState(1);
   const [emailOpen, setEmailOpen] = useState(false);
-  const [visualizeOpen, setVisualizeOpen] = useState(false);
+  const [visualize, setVisualize] = useState<{ open: boolean; focus?: string }>({
+    open: false,
+  });
 
   const fetchBrief = useCallback(async (universeId?: string) => {
     setRefreshing(true);
@@ -152,7 +154,7 @@ export default function App() {
             hoverTicker={hoverTicker}
             hoverItemId={hoverItemId}
             onHover={onTileHover}
-            onVisualize={() => setVisualizeOpen(true)}
+            onVisualize={(ticker) => setVisualize({ open: true, focus: ticker })}
           />
           <div id="signals">
             <PrioritySignals
@@ -187,8 +189,12 @@ export default function App() {
       </div>
 
       {emailOpen && <EmailModal brief={brief} onClose={() => setEmailOpen(false)} />}
-      {visualizeOpen && (
-        <VisualizeModal brief={brief} onClose={() => setVisualizeOpen(false)} />
+      {visualize.open && (
+        <VisualizeModal
+          brief={brief}
+          focusTicker={visualize.focus}
+          onClose={() => setVisualize({ open: false })}
+        />
       )}
     </div>
   );

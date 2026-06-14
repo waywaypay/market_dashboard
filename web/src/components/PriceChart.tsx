@@ -23,10 +23,20 @@ const M = { top: 16, right: 16, bottom: 28, left: 44 };
 const INNER_W = W - M.left - M.right;
 const INNER_H = H - M.top - M.bottom;
 
-export function PriceChart({ brief }: { brief: DailyBrief }) {
+export function PriceChart({
+  brief,
+  focusTicker,
+}: {
+  brief: DailyBrief;
+  focusTicker?: string;
+}) {
   const series = useMemo(() => buildSeries(brief), [brief]);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  // emphasize the clicked ticker (others dimmed) when arriving from a tile
+  const focus =
+    focusTicker && series.some((s) => s.ticker === focusTicker) ? focusTicker : undefined;
 
   const dates = useMemo(() => {
     const set = new Set<string>();
@@ -124,21 +134,27 @@ export function PriceChart({ brief }: { brief: DailyBrief }) {
           />
         )}
 
-        {/* lines (subject last so it sits on top) */}
-        {[...visible].sort((a, b) => Number(a.isSubject) - Number(b.isSubject)).map((s) => (
-          <polyline
-            key={s.ticker}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={s.isSubject ? 2.5 : 1.5}
-            strokeOpacity={s.isSubject ? 1 : 0.85}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            points={s.points
-              .map((p, i) => `${x(dateIndex.get(p.d) ?? 0)},${y(s.pct[i])}`)
-              .join(" ")}
-          />
-        ))}
+        {/* lines: emphasized one (focus, else subject) drawn last, on top */}
+        {[...visible]
+          .sort((a, b) => emphasisRank(a, focus) - emphasisRank(b, focus))
+          .map((s) => {
+            const emph = focus ? s.ticker === focus : s.isSubject;
+            const dimmed = focus ? s.ticker !== focus : false;
+            return (
+              <polyline
+                key={s.ticker}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={emph ? 2.5 : 1.5}
+                strokeOpacity={dimmed ? 0.22 : emph ? 1 : 0.85}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                points={s.points
+                  .map((p, i) => `${x(dateIndex.get(p.d) ?? 0)},${y(s.pct[i])}`)
+                  .join(" ")}
+              />
+            );
+          })}
 
         {/* hover dots */}
         {hoverIdx != null &&
@@ -181,7 +197,11 @@ export function PriceChart({ brief }: { brief: DailyBrief }) {
                 style={{ backgroundColor: s.color }}
                 aria-hidden="true"
               />
-              <span className={`num font-semibold ${s.isSubject ? "text-ink" : "text-muted"}`}>
+              <span
+                className={`num font-semibold ${
+                  s.isSubject || s.ticker === focus ? "text-ink" : "text-muted"
+                }`}
+              >
                 {s.ticker}
               </span>
               <span className="num" style={{ color: last >= 0 ? "#1A7F4B" : "#B42318" }}>
@@ -281,6 +301,11 @@ function niceTicks(min: number, max: number, count: number): number[] {
     ticks.push(Math.round(t * 100) / 100);
   }
   return ticks;
+}
+
+function emphasisRank(s: Series, focus?: string): number {
+  if (focus) return s.ticker === focus ? 2 : 0; // focused line on top
+  return s.isSubject ? 1 : 0; // else subject on top
 }
 
 function pickXTicks(n: number): number[] {
