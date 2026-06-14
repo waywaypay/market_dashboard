@@ -14,25 +14,34 @@ export function MarketStrip({
   hoverItemId,
   onHover,
   onVisualize,
+  watchlistActive,
+  inWatchlist,
+  onToggleMember,
 }: {
   brief: DailyBrief;
   hoverTicker: string | null;
   hoverItemId: string | null;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
   onVisualize: () => void;
+  watchlistActive: boolean;
+  inWatchlist: (ticker: string) => boolean;
+  onToggleMember: (ticker: string) => void;
 }) {
   const [sort, setSort] = useState<SortKey>("config");
   const hasHistory = Object.keys(brief.history).length > 0;
 
   const quotes = useMemo(() => {
-    const subject = brief.market.find((q) => q.ticker === brief.subject_ticker);
-    const rest = brief.market.filter((q) => q.ticker !== brief.subject_ticker);
+    const pool = watchlistActive
+      ? brief.market.filter((q) => inWatchlist(q.ticker))
+      : brief.market;
+    const subject = pool.find((q) => q.ticker === brief.subject_ticker);
+    const rest = pool.filter((q) => q.ticker !== brief.subject_ticker);
     const sorted = [...rest];
     if (sort === "chg") sorted.sort((a, b) => Math.abs(b.chg_pct) - Math.abs(a.chg_pct));
     if (sort === "rvol") sorted.sort((a, b) => (b.rvol ?? 0) - (a.rvol ?? 0));
     if (sort === "ticker") sorted.sort((a, b) => a.ticker.localeCompare(b.ticker));
     return subject ? [subject, ...sorted] : sorted; // subject always pinned
-  }, [brief, sort]);
+  }, [brief, sort, watchlistActive, inWatchlist]);
 
   return (
     <section aria-label="Market strip" className="mx-auto max-w-[1400px] px-4 pt-6 sm:px-6">
@@ -80,7 +89,9 @@ export function MarketStrip({
       />
       {quotes.length === 0 ? (
         <p className="text-sm text-muted">
-          No quotes this run — the market provider returned nothing.
+          {watchlistActive
+            ? "No names in this watchlist are in today's market — add some from Manage watchlists."
+            : "No quotes this run — the market provider returned nothing."}
         </p>
       ) : (
         <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 lg:grid-cols-6">
@@ -94,6 +105,8 @@ export function MarketStrip({
                 (hoverItemId != null && q.driver_item_id === hoverItemId)
               }
               onHover={onHover}
+              showStar={watchlistActive}
+              onToggleMember={onToggleMember}
             />
           ))}
         </ul>
@@ -107,11 +120,15 @@ function Tile({
   isSubject,
   highlighted,
   onHover,
+  showStar,
+  onToggleMember,
 }: {
   quote: Quote;
   isSubject: boolean;
   highlighted: boolean;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
+  showStar: boolean;
+  onToggleMember: (ticker: string) => void;
 }) {
   const dir = quote.chg_pct >= 0 ? "text-up" : "text-down";
   const enter = () => onHover(quote.ticker, quote.driver_item_id ?? null);
@@ -143,14 +160,27 @@ function Tile({
               </span>
             )}
           </span>
-          {quote.flagged && (
-            <span
-              className={`num text-[11px] ${dir}`}
-              title={`Unusual move (${quote.flag_reason}); hover to see the attributed signal`}
-            >
-              ⚑
-            </span>
-          )}
+          <div className="flex items-center gap-1">
+            {quote.flagged && (
+              <span
+                className={`num text-[11px] ${dir}`}
+                title={`Unusual move (${quote.flag_reason}); hover to see the attributed signal`}
+              >
+                ⚑
+              </span>
+            )}
+            {showStar && (
+              <button
+                type="button"
+                onClick={() => onToggleMember(quote.ticker)}
+                aria-label={`Remove ${quote.ticker} from this watchlist`}
+                title="Remove from this watchlist"
+                className="text-[12px] leading-none text-accent transition-colors hover:text-down"
+              >
+                ★
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-1.5 flex items-baseline justify-between gap-2">
           <span className="num text-[15px] text-ink">{fmtPrice(quote.last)}</span>
