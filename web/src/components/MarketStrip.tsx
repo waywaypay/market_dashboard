@@ -13,13 +13,16 @@ export function MarketStrip({
   hoverTicker,
   hoverItemId,
   onHover,
+  onVisualize,
 }: {
   brief: DailyBrief;
   hoverTicker: string | null;
   hoverItemId: string | null;
   onHover: (ticker: string | null, driverItemId: string | null) => void;
+  onVisualize: () => void;
 }) {
   const [sort, setSort] = useState<SortKey>("config");
+  const hasHistory = Object.keys(brief.history).length > 0;
 
   const quotes = useMemo(() => {
     const subject = brief.market.find((q) => q.ticker === brief.subject_ticker);
@@ -36,30 +39,42 @@ export function MarketStrip({
       <SectionHead
         title="Market"
         hint={
-          <div className="flex items-center gap-1" role="group" aria-label="Sort tiles">
-            <span className="mr-1 hidden sm:inline">sort</span>
-            {(
-              [
-                ["config", "peer set"],
-                ["chg", "%chg"],
-                ["rvol", "RVOL"],
-                ["ticker", "A–Z"],
-              ] as [SortKey, string][]
-            ).map(([key, label]) => (
+          <div className="flex items-center gap-2">
+            {hasHistory && (
               <button
-                key={key}
                 type="button"
-                onClick={() => setSort(key)}
-                aria-pressed={sort === key}
-                className={`rounded-sm px-1.5 py-0.5 transition-colors ${
-                  sort === key
-                    ? "bg-ink text-white"
-                    : "text-muted hover:text-ink"
-                }`}
+                onClick={onVisualize}
+                className="flex items-center gap-1 rounded-sm border border-hairline px-1.5 py-0.5 font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+                title="Overlay 3-month price history for the peer set"
               >
-                {label}
+                <span aria-hidden="true">📈</span> Visualize
               </button>
-            ))}
+            )}
+            <div className="flex items-center gap-1" role="group" aria-label="Sort tiles">
+              <span className="mr-1 hidden sm:inline">sort</span>
+              {(
+                [
+                  ["config", "peer set"],
+                  ["chg", "%chg"],
+                  ["rvol", "RVOL"],
+                  ["ticker", "A–Z"],
+                ] as [SortKey, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSort(key)}
+                  aria-pressed={sort === key}
+                  className={`rounded-sm px-1.5 py-0.5 transition-colors ${
+                    sort === key
+                      ? "bg-ink text-white"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
