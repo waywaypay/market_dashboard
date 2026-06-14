@@ -3,16 +3,22 @@
 Best-effort and presentation-only: the chart is a bonus, never a gate, so this
 never raises — an unreachable source just yields ``{}`` and the chart shows an
 empty state. It mirrors the quote tiering: a deterministic fixture series in
-demo mode, and FMP in real mode (the one historical source that answers from
-the cloud IPs the keyless vendors are blocked on). FMP serves history under
-``/api/v3`` (legacy keys) or ``/stable`` (newer keys); we try v3 then stable,
-exactly like the quote provider, and parse tolerantly.
+demo mode, and in real mode a chain of keyed sources that answer from the cloud
+IPs the keyless vendors are blocked on:
+
+  1. FMP historical (``/api/v3`` legacy keys, ``/stable`` newer keys)
+  2. Alpha Vantage ``TIME_SERIES_DAILY`` (free, fills any ticker FMP couldn't —
+     FMP's free plan does not always include historical EOD)
+
+Per ticker, the first source with data wins; the rest of the chain backfills
+only what's still missing, so one source's plan limits don't blank the chart.
 """
 
 from __future__ import annotations
 
 import math
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -20,6 +26,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from pipeline.contracts import PricePoint
+from pipeline.providers.alphavantage_quotes import api_key_from_env as av_api_key
 from pipeline.providers.fmp_quotes import api_key_from_env as fmp_api_key
 from pipeline.providers.util import make_client
 
@@ -28,6 +35,7 @@ DEFAULT_LOOKBACK_DAYS = 90  # ~3 months (the chart window)
 
 V3_HIST_URL = "https://financialmodelingprep.com/api/v3/historical-price-full/{symbol}"
 STABLE_HIST_URL = "https://financialmodelingprep.com/stable/historical-price-eod/light"
+AV_URL = "https://www.alphavantage.co/query"
 
 
 def fetch_history(
@@ -41,73 +49,101 @@ def fetch_history(
     """Per-ticker daily closes, ascending by date. Never raises."""
     if not tickers:
         return {}
-    try:
-        if mode == "fixture":
-            return {t: _fixture_series(t, now, lookback_days) for t in tickers}
-        key = fmp_api_key()
-        if not key:
-            # real mode, but no keyed historical source reachable from this host
-            return {}
-        return _fmp_history(tickers, now, lookback_days, key, transport)
-    except Exception as exc:  # presentation-only — a chart must never fail the run
-        print(f"[history] unavailable ({type(exc).__name__}: {exc})", file=sys.stderr)
-        return {}
+    if mode == "fixture":
+        return {t: _fixture_series(t, now, lookback_days) for t in tickers}
 
-
-# -- real: FMP historical (v3 -> stable) --------------------------------------
-
-
-def _fmp_history(
-    tickers: list[str],
-    now: datetime,
-    lookback_days: int,
-    api_key: str,
-    transport: httpx.BaseTransport | None,
-) -> dict[str, list[PricePoint]]:
     start = (now.astimezone(US_EASTERN).date() - timedelta(days=lookback_days)).isoformat()
     client = make_client(transport=transport, timeout=10.0)
+    out: dict[str, list[PricePoint]] = {}
+
+    # 1) FMP (the user's primary historical key)
+    fmp_key = fmp_api_key()
+    if fmp_key:
+        _collect(out, tickers, lambda t: _fmp_one(client, t, start, fmp_key))
+
+    # 2) Alpha Vantage backfills whatever FMP couldn't return
+    missing = [t for t in tickers if t not in out]
+    av_key = av_api_key()
+    if missing and av_key:
+        # AV's free tier is rate-limited (5/min, 25/day) — pace and run serially
+        _collect(out, missing, lambda t: _av_one(client, t, start, av_key), serial=True)
+
+    have = len(out)
+    if have < len(tickers):
+        print(
+            f"[history] {have}/{len(tickers)} tickers have a series "
+            f"(fmp_key={'y' if fmp_key else 'n'}, av_key={'y' if av_key else 'n'})",
+            file=sys.stderr,
+        )
+    return out
+
+
+def _collect(out, tickers, fetch_one, serial: bool = False) -> None:
+    """Run fetch_one per ticker (best-effort), recording non-empty series."""
 
     def one(ticker: str) -> tuple[str, list[PricePoint]]:
         try:
-            return ticker, _fmp_one(client, ticker, start, api_key)
+            return ticker, fetch_one(ticker)
         except Exception as exc:
-            print(f"[history] {ticker}: FMP {type(exc).__name__}: {exc}", file=sys.stderr)
+            print(f"[history] {ticker}: {type(exc).__name__}: {exc}", file=sys.stderr)
             return ticker, []
 
-    out: dict[str, list[PricePoint]] = {}
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        for ticker, series in pool.map(one, tickers):
-            if series:
-                out[ticker] = series
-    return out
+    if serial:
+        results = [one(t) for t in tickers]
+    else:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(one, tickers))
+    for ticker, series in results:
+        if series:
+            out[ticker] = series
+
+
+# -- FMP historical (v3 -> stable) --------------------------------------------
 
 
 def _fmp_one(client: httpx.Client, ticker: str, start: str, api_key: str) -> list[PricePoint]:
     try:
-        return _fmp_v3(client, ticker, start, api_key)
+        data = _json(
+            client,
+            V3_HIST_URL.format(symbol=ticker.upper()),
+            {"from": start, "serietype": "line", "apikey": api_key},
+        )
+        return _points(_rows(data), ("close", "adjClose", "price"))
     except Exception:
-        return _fmp_stable(client, ticker, start, api_key)
+        data = _json(
+            client, STABLE_HIST_URL, {"symbol": ticker.upper(), "from": start, "apikey": api_key}
+        )
+        return _points(_rows(data), ("price", "close", "adjClose"))
 
 
-def _fmp_v3(client: httpx.Client, ticker: str, start: str, api_key: str) -> list[PricePoint]:
-    data = _json(
-        client,
-        V3_HIST_URL.format(symbol=ticker.upper()),
-        {"from": start, "serietype": "line", "apikey": api_key},
+# -- Alpha Vantage TIME_SERIES_DAILY (free) -----------------------------------
+
+
+def _av_one(client: httpx.Client, ticker: str, start: str, api_key: str) -> list[PricePoint]:
+    time.sleep(0.2)  # gentle pacing under AV's free 5/min ceiling
+    response = client.get(
+        AV_URL,
+        params={
+            "function": "TIME_SERIES_DAILY",
+            "symbol": ticker.upper(),
+            "outputsize": "compact",  # last 100 sessions covers the ~3mo window
+            "apikey": api_key,
+        },
     )
-    rows = data.get("historical") if isinstance(data, dict) else None
-    if not rows:
-        raise RuntimeError("no historical array")
-    return _points(rows, close_keys=("close", "adjClose"))
+    if response.status_code != 200:
+        raise RuntimeError(f"AV HTTP {response.status_code}")
+    data = response.json()
+    if "Note" in data or "Information" in data or "Error Message" in data:
+        raise RuntimeError(str(data.get("Note") or data.get("Information") or data.get("Error Message"))[:120])
+    rows = [
+        {"date": day, "close": vals.get("4. close")}
+        for day, vals in (data.get("Time Series (Daily)") or {}).items()
+        if day >= start
+    ]
+    return _points(rows, ("close",))
 
 
-def _fmp_stable(client: httpx.Client, ticker: str, start: str, api_key: str) -> list[PricePoint]:
-    data = _json(
-        client, STABLE_HIST_URL, {"symbol": ticker.upper(), "from": start, "apikey": api_key}
-    )
-    if not isinstance(data, list) or not data:
-        raise RuntimeError("no historical rows")
-    return _points(data, close_keys=("price", "close", "adjClose"))
+# -- shared parsing -----------------------------------------------------------
 
 
 def _json(client: httpx.Client, url: str, params: dict[str, str]):
@@ -118,6 +154,16 @@ def _json(client: httpx.Client, url: str, params: dict[str, str]):
     if isinstance(data, dict) and ("Error Message" in data or "message" in data):
         raise RuntimeError(str(data.get("Error Message") or data.get("message"))[:120])
     return data
+
+
+def _rows(data) -> list:
+    """FMP returns either a bare list or {"historical": [...]} depending on the
+    endpoint/plan — accept both."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        return data.get("historical") or data.get("results") or []
+    return []
 
 
 def _points(rows: list, close_keys: tuple[str, ...]) -> list[PricePoint]:
@@ -131,7 +177,7 @@ def _points(rows: list, close_keys: tuple[str, ...]) -> list[PricePoint]:
             pts.append(PricePoint(d=str(day)[:10], c=round(float(close), 4)))
         except (TypeError, ValueError):
             continue
-    pts.sort(key=lambda p: p.d)  # FMP returns newest-first; the chart wants ascending
+    pts.sort(key=lambda p: p.d)  # sources vary newest/oldest-first; the chart wants ascending
     return pts
 
 

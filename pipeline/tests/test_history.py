@@ -19,8 +19,12 @@ COMPANIES = {"VCYT": "Veracyte", "NTRA": "Natera"}
 
 
 @pytest.fixture(autouse=True)
-def _no_ambient_fmp_key(monkeypatch):
-    for name in ("FMP_KEY", "FMP_API_KEY", "FINANCIALMODELINGPREP_API_KEY"):
+def _no_ambient_keys(monkeypatch):
+    for name in (
+        "FMP_KEY", "FMP_API_KEY", "FINANCIALMODELINGPREP_API_KEY",
+        "ALPHAVANTAGE_API_KEY", "ALPHA_VANTAGE_API_KEY", "ALPHAVANTAGE_KEY",
+        "ALPHA_VANTAGE_KEY", "AV_API_KEY", "AV_KEY",
+    ):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -80,7 +84,62 @@ def test_real_history_falls_back_to_stable(monkeypatch) -> None:
     assert [p.c for p in out["VCYT"]] == [46.0, 47.3]
 
 
-def test_real_history_is_empty_without_a_key() -> None:
+def test_real_history_falls_back_to_stable_dict_wrapped(monkeypatch) -> None:
+    """Some FMP plans wrap /stable history in an object instead of a bare list."""
+    monkeypatch.setenv("FMP_KEY", "k")
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.startswith("/api/v3/"):
+            return httpx.Response(403, json={"Error Message": "Exclusive Endpoint"})
+        return httpx.Response(
+            200,
+            json={"symbol": "VCYT", "historical": [{"date": "2026-06-12", "price": 47.3}]},
+        )
+
+    out = fetch_history(
+        COMPANIES, ["VCYT"], NOW, "real", transport=httpx.MockTransport(handler)
+    )
+    assert [p.c for p in out["VCYT"]] == [47.3]
+
+
+def test_alpha_vantage_backfills_when_fmp_has_no_history(monkeypatch) -> None:
+    """FMP's free plan may exclude historical EOD; Alpha Vantage's free
+    TIME_SERIES_DAILY backfills it. Pre-window points are dropped."""
+    monkeypatch.setenv("FMP_KEY", "k")
+    monkeypatch.setenv("ALPHA_VANTAGE_KEY", "av")
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if "financialmodelingprep.com" in req.url.host:
+            return httpx.Response(403, json={"Error Message": "Exclusive Endpoint"})
+        assert "alphavantage.co" in req.url.host
+        params = dict(req.url.params)
+        assert params["function"] == "TIME_SERIES_DAILY" and params["apikey"] == "av"
+        return httpx.Response(
+            200,
+            json={
+                "Time Series (Daily)": {
+                    "2026-06-12": {"4. close": "47.30"},
+                    "2026-06-11": {"4. close": "46.00"},
+                    "2026-01-01": {"4. close": "10.00"},  # before the window -> dropped
+                }
+            },
+        )
+
+    out = fetch_history(
+        COMPANIES, ["VCYT"], NOW, "real", transport=httpx.MockTransport(handler)
+    )
+    assert [p.c for p in out["VCYT"]] == [46.0, 47.3]  # ascending, pre-window filtered
+
+
+def test_alpha_vantage_rate_limit_yields_empty_not_raise(monkeypatch) -> None:
+    monkeypatch.setenv("ALPHA_VANTAGE_KEY", "av")  # no FMP key -> AV is the only source
+    transport = httpx.MockTransport(
+        lambda req: httpx.Response(200, json={"Information": "25 requests/day reached"})
+    )
+    assert fetch_history(COMPANIES, ["VCYT"], NOW, "real", transport=transport) == {}
+
+
+def test_real_history_is_empty_without_any_key() -> None:
     assert fetch_history(COMPANIES, ["VCYT"], NOW, "real") == {}
 
 
