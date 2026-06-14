@@ -22,6 +22,7 @@ from pipeline.contracts import DailyBrief, UniverseConfig
 from pipeline.contracts.universe import discover_universes, load_universe
 from pipeline.email_render import email_subject, render_email
 from pipeline.market_hours import next_market_open
+from pipeline.providers.history import fetch_history
 from pipeline.providers.registry import ProviderSet, build_providers
 from pipeline.stages.fuse import run_fuse
 from pipeline.stages.output import assemble_brief, write_artifacts
@@ -42,6 +43,10 @@ def run_universe(
     src = run_source(universe, providers, now)
     proc = run_process(src.items, universe, providers.classifier)
     fused = run_fuse(proc.items, src.quotes, universe)
+    # Historical closes for the overlay chart — best-effort, presentation-only.
+    history = fetch_history(
+        universe.companies, universe.tickers, now, providers.modes.get("quotes", "fixture")
+    )
     brief = assemble_brief(
         universe=universe,
         items=fused.items,
@@ -53,6 +58,7 @@ def run_universe(
         generated_at=now,
         market_open_at=next_market_open(now),
         provider_modes=providers.modes,
+        history=history,
     )
 
     written = write_artifacts(brief, web_public, default=default)
