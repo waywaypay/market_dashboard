@@ -89,7 +89,7 @@ class AnthropicClassifierProvider(ClassifierProvider):
         for _attempt in range(1 + self.max_retries):
             try:
                 batch = self._call(system, user)
-                return self._reconcile(batch, items, universe)
+                return reconcile_batch(batch, items, universe, engine="anthropic")
             except Exception as exc:  # parse/validation/API failure -> retry once
                 last_error = exc
         # Fall back to deterministic rules — never crash the run.
@@ -116,30 +116,36 @@ class AnthropicClassifierProvider(ClassifierProvider):
             parsed = ClassificationBatch.model_validate_json(_strip_fences(text))
         return parsed
 
-    def _reconcile(
-        self, batch: ClassificationBatch, items: list[RawItem], universe: UniverseConfig
-    ) -> ClassifierResult:
-        """Enforce invariants the schema can't: known ids, configured taxonomy."""
-        by_id = {i.id: i for i in items}
-        seen: dict[str, Classification] = {}
-        for c in batch.classifications:
-            if c.item_id not in by_id or c.item_id in seen:
-                continue  # hallucinated or duplicate id — drop
-            if c.category not in universe.categories:
-                c = c.model_copy(
-                    update={
-                        "category": rules.classify_item(by_id[c.item_id], universe).category
-                    }
-                )
-            seen[c.item_id] = c
-        # Any item the model skipped gets rule-based tagging.
-        out = [
-            seen.get(i.id) or rules.classify_item(i, universe)
-            for i in items
-        ]
-        if not batch.tldr.strip():
-            raise ValueError("classifier returned an empty tldr")
-        return ClassifierResult(tldr=batch.tldr.strip(), classifications=out, engine="anthropic")
+def reconcile_batch(
+    batch: ClassificationBatch,
+    items: list[RawItem],
+    universe: UniverseConfig,
+    engine: str = "anthropic",
+) -> ClassifierResult:
+    """Enforce invariants the schema can't: known ids, configured taxonomy.
+
+    Shared by every LLM classifier (Anthropic direct, Claude-via-Venice) so they
+    reconcile model output identically; only the provenance `engine` differs."""
+    by_id = {i.id: i for i in items}
+    seen: dict[str, Classification] = {}
+    for c in batch.classifications:
+        if c.item_id not in by_id or c.item_id in seen:
+            continue  # hallucinated or duplicate id — drop
+        if c.category not in universe.categories:
+            c = c.model_copy(
+                update={
+                    "category": rules.classify_item(by_id[c.item_id], universe).category
+                }
+            )
+        seen[c.item_id] = c
+    # Any item the model skipped gets rule-based tagging.
+    out = [
+        seen.get(i.id) or rules.classify_item(i, universe)
+        for i in items
+    ]
+    if not batch.tldr.strip():
+        raise ValueError("classifier returned an empty tldr")
+    return ClassifierResult(tldr=batch.tldr.strip(), classifications=out, engine=engine)
 
 
 def _strip_fences(text: str) -> str:
