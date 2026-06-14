@@ -158,6 +158,10 @@ export default function App() {
         brief={brief}
         universes={universes}
         onSelectUniverse={(id) => void fetchBrief(id)}
+        watchlists={wl.watchlists}
+        activeWatchlistId={wl.activeId}
+        onSelectWatchlist={wl.setActiveId}
+        onManageWatchlists={() => setWatchlistOpen(true)}
         onRefresh={() => void hardRefresh(brief.universe_id)}
         refreshing={refreshing}
       />
@@ -195,10 +199,6 @@ export default function App() {
         <div className="order-first px-4 pt-6 sm:px-6 lg:order-none lg:w-[300px] lg:shrink-0 lg:px-0 lg:pt-6">
           <RightRail
             brief={brief}
-            watchlists={wl.watchlists}
-            activeWatchlistId={wl.activeId}
-            onSelectWatchlist={wl.setActiveId}
-            onManageWatchlists={() => setWatchlistOpen(true)}
             activeCategories={activeCategories}
             onToggleCategory={(cat) =>
               setActiveCategories((prev) => {
