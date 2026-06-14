@@ -815,6 +815,74 @@ def test_stooq_provider_raises_when_nothing_usable() -> None:
         provider.snapshot(["VCYT"])
 
 
+# Datacenter egress IPs often get an HTTP-200 JavaScript "verify your browser"
+# wall instead of CSV (the noscript text the real interstitial carries).
+STOOQ_BOT_WALL = (
+    '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    '<meta name="robots" content="noindex,nofollow"></head><body>'
+    "<noscript>This site requires JavaScript to verify your browser. "
+    "Please enable JavaScript and reload.</noscript></body></html>"
+)
+
+
+def test_stooq_provider_detects_bot_challenge_and_fails_fast() -> None:
+    """An HTTP-200 bot-challenge page must not be parsed as data; being per-IP
+    and identical for every ticker, it short-circuits the tier (history probed
+    for the first ticker only, not all three) and surfaces an honest reason."""
+    history_symbols: list[str] = []
+
+    def walled(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/q/d/l/":
+            history_symbols.append(dict(req.url.params)["s"])
+        return httpx.Response(200, text=STOOQ_BOT_WALL)
+
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(walled),
+    )
+    with pytest.raises(RuntimeError, match="bot-challenge"):
+        provider.snapshot(["VCYT", "NTRA", "GH"])
+    assert len(set(history_symbols)) <= 1  # stopped after the first ticker
+
+
+def test_stooq_provider_detects_hit_limit_notice() -> None:
+    """Stooq answers an over-quota IP with HTTP 200 + a plain-text limit notice;
+    treat it as blocked, not as an empty CSV with no rows."""
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(200, text="Exceeded the daily hits limit")
+        ),
+    )
+    with pytest.raises(RuntimeError, match="daily-hit-limit"):
+        provider.snapshot(["VCYT"])
+
+
+def test_stooq_provider_uses_mirror_when_one_edge_walls() -> None:
+    """A wall on one edge isn't terminal if the mirror still serves CSV."""
+
+    def one_edge_walled(req: httpx.Request) -> httpx.Response:
+        if req.url.host == "stooq.com":
+            return httpx.Response(200, text=STOOQ_BOT_WALL)
+        return stooq_handler(req)  # stooq.pl is healthy
+
+    provider = StooqQuoteProvider(
+        companies=COMPANIES,
+        throttle_s=0,
+        backoff_s=0,
+        now=STOOQ_SESSION_NOW,
+        transport=httpx.MockTransport(one_edge_walled),
+    )
+    (q,) = [x for x in provider.snapshot(["VCYT"]) if x.ticker == "VCYT"]
+    assert q.last == 111.3  # served by the unwalled mirror
+
+
 # ------------------------------------------------ Alpha Vantage (keyed last resort)
 
 AV_WEEKEND_NOW = datetime(2026, 6, 13, 12, 0, tzinfo=ZoneInfo("America/New_York"))  # Saturday
