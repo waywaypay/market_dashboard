@@ -2,6 +2,7 @@
  * universe selector (config swap), manual refresh. */
 import { useEffect, useState } from "react";
 import type { DailyBrief, UniverseEntry } from "../lib/contracts";
+import type { Watchlist } from "../lib/watchlists";
 import { fmtCountdown, fmtDate } from "../lib/format";
 import { Mark } from "./bits";
 
@@ -9,12 +10,20 @@ export function Header({
   brief,
   universes,
   onSelectUniverse,
+  watchlists,
+  activeWatchlistId,
+  onSelectWatchlist,
+  onManageWatchlists,
   onRefresh,
   refreshing,
 }: {
   brief: DailyBrief;
   universes: UniverseEntry[];
   onSelectUniverse: (id: string) => void;
+  watchlists: Watchlist[];
+  activeWatchlistId: string | null;
+  onSelectWatchlist: (id: string | null) => void;
+  onManageWatchlists: () => void;
   onRefresh: () => void;
   refreshing: boolean;
 }) {
@@ -61,7 +70,7 @@ export function Header({
           {countdown}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-x-2 gap-y-2">
           <label htmlFor="universe" className="text-[11px] uppercase tracking-wider text-faint">
             Universe
           </label>
@@ -87,6 +96,36 @@ export function Header({
               </option>
             ))}
           </select>
+
+          {/* Custom watchlists: pick a saved focus or open the editor. A
+              personal lens over the universe, saved in this browser. */}
+          <label htmlFor="watchlist" className="text-[11px] uppercase tracking-wider text-faint">
+            Watchlist
+          </label>
+          <div className="flex items-center">
+            <select
+              id="watchlist"
+              className="rounded-l-sm border border-white/20 bg-ink px-2 py-1.5 text-[13px] text-white"
+              value={activeWatchlistId ?? ""}
+              onChange={(e) => onSelectWatchlist(e.target.value || null)}
+            >
+              <option value="">All names</option>
+              {watchlists.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name || "Untitled"} · {w.tickers.length}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onManageWatchlists}
+              className="-ml-px rounded-r-sm border border-white/20 px-2.5 py-1.5 text-[12px] text-white/90 transition-colors hover:border-accent hover:text-accent"
+              title="Create or edit watchlists"
+            >
+              {watchlists.length ? "★ Manage" : "★ New"}
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onRefresh}
